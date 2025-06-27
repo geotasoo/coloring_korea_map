@@ -8,9 +8,7 @@
   <style>
     html, body { height:100vh; margin:0; padding:0; background:#ffffff; }
     body { display:flex; flex-direction:column; }
-    #map { flex:1; }
-    #map { height:70%; margin:0; padding:0; background:#ffffff; }
-    body { display:flex; flex-direction:column; }
+    #map { flex:1; height:70%; margin:0; padding:0; background:#ffffff; }
     header {
       background:rgb(156, 218, 230);
       color:#fff;
@@ -20,7 +18,6 @@
       justify-content: space-between;
       align-items: center;
     }
-    /* "의견 남기기" 언더라인 없애기 */
     header a {
       color: #fff;
       font-size: 15px;
@@ -48,6 +45,74 @@
       opacity: 1;
       pointer-events: auto;
     }
+
+    /* --- 드롭다운 멀티체크박스 --- */
+    .dropdown {
+      position: relative;
+      display: inline-block;
+      min-width: 100px;
+      z-index: 1000;
+    }
+    .dropdown-btn {
+      min-width: 110px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      border:1px solid #ccc;
+      border-radius: 4px;
+      background: white;
+      cursor: pointer;
+      padding: 4px 12px;
+      font-size: 1em;
+      font-family: inherit;
+    }
+    .dropdown-btn span.count {
+      color: #444;
+      font-size: 0.97em;
+      background: #e6f1fa;
+      border-radius: 8px;
+      padding: 2px 8px;
+      margin-left: 4px;
+    }
+    .dropdown-content {
+      display: none;
+      position: absolute;
+      top: 120%;
+      left: 0;
+      min-width: 190px;
+      max-height: 310px;
+      overflow-y: auto;
+      background: #fff;
+      border: 1.5px solid #bbb;
+      border-radius: 7px;
+      box-shadow: 0 6px 22px rgba(0,0,0,0.13);
+      padding: 10px 10px 10px 10px;
+      z-index: 9999;
+      font-size: 0.97em;
+      animation: dropdownOpen .19s cubic-bezier(.4,0,.2,1);
+    }
+    @keyframes dropdownOpen {
+      from { opacity: 0; transform: translateY(-8px);}
+      to   { opacity: 1; transform: translateY(0);}
+    }
+    .dropdown.open .dropdown-content { display: block; }
+    .dropdown-content label { display: flex; align-items: center; margin-bottom: 5px; cursor: pointer; }
+    .dropdown-content input[type=checkbox] { margin-right: 6px; }
+    .dropdown-content .dropdown-actions {
+      display: flex; gap: 8px; margin-bottom: 8px; margin-top: -2px;
+    }
+    .dropdown-content .dropdown-actions button {
+      font-size: 0.97em;
+      padding: 2px 10px;
+      border:1px solid #ccd;
+      border-radius: 3px;
+      background: #f4f7fa;
+      cursor:pointer;
+      transition:background .13s;
+    }
+    .dropdown-content .dropdown-actions button:hover {
+      background: #c5e1f8;
+    }
     @media (max-width: 700px) {
       header { font-size: 15px; padding: 8px; }
       #toolbar { flex-wrap: wrap; gap: 8px; padding: 6px; font-size: 0.95em; overflow-x: auto; }
@@ -62,12 +127,12 @@
       #toolbar { font-size: 0.88em; gap: 5px; padding: 4px; }
       #toolbar .palette-box { width: 22px; height: 22px; }
       #map { height: 54vh; min-height: 120px; }
+      .dropdown-content { min-width: 150px; font-size: 0.93em; }
     }
     .leaflet-interactive:focus {
       outline: none !important;
       box-shadow: none !important;
     }
-    /* 커스텀 툴팁 스타일 */
     .map-custom-tooltip {
       position: fixed;
       pointer-events: none;
@@ -100,6 +165,20 @@
   </header>
   <div id="toolbar">
     <button id="btn-sg" class="mode-sg" aria-label="시군/시도 모드 토글" title="시군/시도 모드 토글">시군</button>
+    <!-- 드롭다운 시도 선택 -->
+    <div class="dropdown" id="provinceDropdown">
+      <button type="button" class="dropdown-btn" id="provinceDropdownBtn">
+        시도 선택 <span id="provinceSelectedCount" class="count">0</span> ▼
+      </button>
+      <div class="dropdown-content" id="provinceDropdownContent">
+        <div class="dropdown-actions">
+          <button type="button" id="btn-province-all">전체 선택</button>
+          <button type="button" id="btn-province-none">전체 해제</button>
+        </div>
+        <!-- 체크박스는 JS에서 동적 생성 -->
+        <div id="provinceCheckboxes"></div>
+      </div>
+    </div>
     <label>색상:<input type="color" id="colorPicker" value="#FFD700" aria-label="색상 선택"></label>
     <div id="paletteButtons" style="display:flex; gap:4px;">
       <div class="palette-box" id="palette-custom" data-color="#444444" style="background:#444444" title="색상 #444444"></div>
@@ -120,7 +199,6 @@
     <label>확대 레벨:<span id="zoom-level">6.5</span></label>
   </div>
   <div id="map"></div>
-  <!-- 커스텀 툴팁용 div 추가 -->
   <div id="map-custom-tooltip" class="map-custom-tooltip"></div>
   <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
   <script>
@@ -129,9 +207,7 @@
     function showCustomTooltip(html, event) {
       tooltipDiv.innerHTML = html;
       tooltipDiv.classList.add('visible');
-      // 마우스 좌표에 툴팁 위치(살짝 우상단으로)
       const offsetX = 15, offsetY = 8;
-      // event는 leaflet의 MouseEvent (originalEvent로 접근)
       const clientX = event.originalEvent.clientX, clientY = event.originalEvent.clientY;
       tooltipDiv.style.left = (clientX + offsetX) + 'px';
       tooltipDiv.style.top  = (clientY + offsetY) + 'px';
@@ -168,6 +244,10 @@
           coloredSg = new Map();
     let sdLayer, sgLayer, sdBorderLayer;
 
+    // ✅✅✅ 시도 선택 상태 저장
+    let selectedProvinces = new Set();
+    let provinceNames = [];
+
     // --- 툴바: 팔레트/컬러피커 동기화 ---
     document.querySelectorAll('.palette-box').forEach(b => b.addEventListener('click', () => {
       highlightFill = b.dataset.color;
@@ -176,7 +256,6 @@
 
     document.getElementById('colorPicker').addEventListener('input', e => {
       highlightFill = e.target.value;
-      // 첫 번째 팔레트(palette-custom)는 더이상 바꾸지 않음!
     });
 
     // --- 툴바: 지도 확대/축소 ---
@@ -241,7 +320,6 @@
       }
     }
 
-    // --- 색칠 토글 함수 ---
     function toggleSdLayerColor(layer) {
       const id = layer._leaflet_id;
       const on = !coloredSd.get(id);
@@ -255,87 +333,192 @@
       layer.setStyle(getSgStyle(layer));
     }
 
-    // --- 색상 일괄 초기화 함수 ---
     function resetSdLayerColors() {
       coloredSd.clear();
-      sdLayer.eachLayer(layer => layer.setStyle(getSdStyle(layer)));
+      sdLayer && sdLayer.eachLayer(layer => layer.setStyle(getSdStyle(layer)));
     }
     function resetSgLayerColors() {
       coloredSg.clear();
-      sgLayer.eachLayer(layer => layer.setStyle(getSgStyle(layer)));
+      sgLayer && sgLayer.eachLayer(layer => layer.setStyle(getSgStyle(layer)));
     }
 
-    // --- 강조효과(페이드) 함수 ---
     function animateMapFade(cb) {
       const mapDiv = document.getElementById('map');
       mapDiv.classList.add('animated-fade');
       setTimeout(() => {
-        cb(); // 레이어 토글 등 콜백
+        cb();
         mapDiv.classList.remove('animated-fade');
         mapDiv.classList.add('animated-fade-in');
         setTimeout(() => mapDiv.classList.remove('animated-fade-in'), 400);
       }, 300);
     }
 
-    // --- GeoJSON 레이어 불러오기 및 생성 (커스텀 툴팁 적용) ---
+    // --- 시도 드롭다운 기능 ---
+    function updateProvinceSelectedCount() {
+      document.getElementById('provinceSelectedCount').textContent = selectedProvinces.size;
+    }
+
+    function closeProvinceDropdown() {
+      document.getElementById('provinceDropdown').classList.remove('open');
+    }
+    function openProvinceDropdown() {
+      document.getElementById('provinceDropdown').classList.add('open');
+    }
+
+    document.addEventListener('click', function(e) {
+      const dropdown = document.getElementById('provinceDropdown');
+      if (!dropdown.contains(e.target)) {
+        closeProvinceDropdown();
+      }
+    });
+
+    document.getElementById('provinceDropdownBtn').addEventListener('click', function(e) {
+      e.stopPropagation();
+      const dd = document.getElementById('provinceDropdown');
+      if (dd.classList.contains('open')) {
+        closeProvinceDropdown();
+      } else {
+        openProvinceDropdown();
+      }
+    });
+
+    // --- GeoJSON fetch 및 시도 체크박스 동적 생성 ---
     Promise.all([
       fetch('q_sd.json').then(r => r.json()),
       fetch('q_sg.json').then(r => r.json())
     ]).then(([sdJson, sgJson]) => {
-      sdLayer = L.geoJSON(sdJson, {
-        style: getSdStyle,
-        onEachFeature: (feature, layer) => {
-          // 클릭 이벤트
-          layer.on('click', () => {
-            if (!sgVisible) {
-              toggleSdLayerColor(layer);
-              sdBorderLayer.bringToFront();
+      provinceNames = [...new Set(sdJson.features.map(f => f.properties.CTP_KOR_NM))];
+      const provinceCheckboxesDiv = document.getElementById('provinceCheckboxes');
+
+      // 체크박스 생성
+      provinceCheckboxesDiv.innerHTML = '';
+      provinceNames.forEach(name => {
+        const id = 'prov-' + name;
+        const label = document.createElement('label');
+        label.innerHTML = `<input type="checkbox" id="${id}" value="${name}"> ${name}`;
+        provinceCheckboxesDiv.appendChild(label);
+      });
+
+      // 초기 상태: 모두 선택
+      selectedProvinces = new Set(provinceNames);
+      provinceCheckboxesDiv.querySelectorAll('input[type=checkbox]').forEach(cb => cb.checked = true);
+      updateProvinceSelectedCount();
+
+      // 전체 선택/해제 버튼 이벤트
+      document.getElementById('btn-province-all').addEventListener('click', () => {
+        provinceNames.forEach(name => selectedProvinces.add(name));
+        provinceCheckboxesDiv.querySelectorAll('input[type=checkbox]').forEach(cb => cb.checked = true);
+        updateProvinceSelectedCount();
+        animateMapFade(updateLayers);
+      });
+      document.getElementById('btn-province-none').addEventListener('click', () => {
+        selectedProvinces.clear();
+        provinceCheckboxesDiv.querySelectorAll('input[type=checkbox]').forEach(cb => cb.checked = false);
+        updateProvinceSelectedCount();
+        animateMapFade(updateLayers);
+      });
+
+      // 각 체크박스 클릭 이벤트
+      provinceCheckboxesDiv.querySelectorAll('input[type=checkbox]').forEach(checkbox => {
+        checkbox.addEventListener('change', function() {
+          if (this.checked) selectedProvinces.add(this.value);
+          else selectedProvinces.delete(this.value);
+          updateProvinceSelectedCount();
+          animateMapFade(updateLayers);
+        });
+      });
+
+      function createSdLayer(filterFunc) {
+        return L.geoJSON(sdJson, {
+          filter: filterFunc,
+          style: getSdStyle,
+          onEachFeature: (feature, layer) => {
+            layer.on('click', () => {
+              if (!sgVisible) {
+                toggleSdLayerColor(layer);
+                sdBorderLayer.bringToFront();
+              }
+            });
+            if (feature.properties && feature.properties.CTP_KOR_NM) {
+              const name = feature.properties.CTP_KOR_NM;
+              layer.on('mouseover', e => showCustomTooltip(name, e));
+              layer.on('mousemove', e => showCustomTooltip(name, e));
+              layer.on('mouseout', hideCustomTooltip);
             }
-          });
-          // 커스텀 툴팁: 시도(CTP_KOR_NM)
-          if (feature.properties && feature.properties.CTP_KOR_NM) {
-            const name = feature.properties.CTP_KOR_NM;
-            layer.on('mouseover', e => showCustomTooltip(name, e));
-            layer.on('mousemove', e => showCustomTooltip(name, e));
-            layer.on('mouseout', hideCustomTooltip);
           }
-        }
-      }).addTo(map);
-
-      sgLayer = L.geoJSON(sgJson, {
-        style: getSgStyle,
-        onEachFeature: (feature, layer) => {
-          // 클릭 이벤트
-          layer.on('click', () => {
-            if (sgVisible) {
-              toggleSgLayerColor(layer);
-              sdBorderLayer.bringToFront();
+        });
+      }
+      function createSgLayer(filterFunc) {
+        return L.geoJSON(sgJson, {
+          filter: filterFunc,
+          style: getSgStyle,
+          onEachFeature: (feature, layer) => {
+            layer.on('click', () => {
+              if (sgVisible) {
+                toggleSgLayerColor(layer);
+                sdBorderLayer.bringToFront();
+              }
+            });
+            if (feature.properties && feature.properties.SIG_KOR_NM) {
+              const name = feature.properties.SIG_KOR_NM;
+              layer.on('mouseover', e => showCustomTooltip(name, e));
+              layer.on('mousemove', e => showCustomTooltip(name, e));
+              layer.on('mouseout', hideCustomTooltip);
             }
-          });
-          // 커스텀 툴팁: 시군(SIG_KOR_NM)
-          if (feature.properties && feature.properties.SIG_KOR_NM) {
-            const name = feature.properties.SIG_KOR_NM;
-            layer.on('mouseover', e => showCustomTooltip(name, e));
-            layer.on('mousemove', e => showCustomTooltip(name, e));
-            layer.on('mouseout', hideCustomTooltip);
           }
+        });
+      }
+
+      function updateLayers() {
+        if (sdLayer) { map.removeLayer(sdLayer); }
+        if (sgLayer) { map.removeLayer(sgLayer); }
+        if (sdBorderLayer) { map.removeLayer(sdBorderLayer); }
+
+        const selected = Array.from(selectedProvinces);
+        let sdFilter = null, sgFilter = null;
+
+        if (selected.length === 0) {
+          sdFilter = f => false; // 아무것도 안보이게!
+          sgFilter = f => false;
+        } else {
+          sdFilter = f => selected.includes(f.properties.CTP_KOR_NM);
+          sgFilter = f => selected.includes(f.properties.CTP_KOR_NM);
         }
-      }).addTo(map);
 
-      sdBorderLayer = L.geoJSON(sdJson, {
-        style: () => ({
-          color: '#222',
-          weight: parseFloat(document.getElementById('slider-sd').value),
-          fillOpacity: 0,
-          opacity: 1
-        }),
-        interactive: false
-      }).addTo(map);
-      sdBorderLayer.bringToFront();
+        sdLayer = createSdLayer(sdFilter).addTo(map);
+        sgLayer = createSgLayer(sgFilter);
 
-      map.fitBounds(L.featureGroup([sdLayer, sgLayer, sdBorderLayer]).getBounds(), { padding: [20, 20] });
+        sdBorderLayer = L.geoJSON(sdJson, {
+          filter: sdFilter,
+          style: () => ({
+            color: '#222',
+            weight: parseFloat(document.getElementById('slider-sd').value),
+            fillOpacity: 0,
+            opacity: 1
+          }),
+          interactive: false
+        }).addTo(map);
+        sdBorderLayer.bringToFront();
 
-      // --- 시군/시도 토글 버튼 ---
+        if (sgVisible) {
+          sdLayer.setStyle({ fillOpacity: 0, opacity: 0.5 });
+          map.addLayer(sgLayer);
+        } else {
+          map.removeLayer(sgLayer);
+          sdLayer.setStyle({ fillOpacity: defaultLandOpacity, opacity: 1 });
+        }
+
+        let boundsGroup = [sdLayer, sdBorderLayer];
+        if (sgVisible) boundsGroup.push(sgLayer);
+        try {
+          map.fitBounds(L.featureGroup(boundsGroup).getBounds(), { padding: [20, 20] });
+        } catch(e) {}
+      }
+
+      // 최초 전체 보기
+      updateLayers();
+
+      // 시군/시도 토글 버튼
       document.getElementById('btn-sg').addEventListener('click', () => {
         animateMapFade(() => {
           sgVisible = !sgVisible;
@@ -344,20 +527,15 @@
             btn.textContent = '시군';
             btn.classList.add('mode-sg');
             btn.classList.remove('mode-sd');
-            map.addLayer(sgLayer);
-            resetSdLayerColors();
           } else {
             btn.textContent = '시도';
             btn.classList.add('mode-sd');
             btn.classList.remove('mode-sg');
-            map.removeLayer(sgLayer);
-            resetSgLayerColors();
           }
-          sdBorderLayer.bringToFront();
+          updateLayers();
         });
       });
 
-      // --- 경계 굵기 슬라이더 ---
       document.getElementById('slider-sd').addEventListener('input', e => {
         const w = +e.target.value;
         document.getElementById('sd-value').textContent = w.toFixed(1);
@@ -371,10 +549,7 @@
         sdBorderLayer.bringToFront();
       });
 
-      // --- 초기화 ---
       document.getElementById('btn-reset').addEventListener('click', () => location.reload());
-
-      // --- PNG 저장 (미구현 안내) ---
       document.getElementById('savePng').addEventListener('click', () => alert('저장 기능을 만들다가 계속 실패. 😢😡😵‍💫 [shift]+[win]+[s]를 이용해주세요.'));
     });
   </script>
