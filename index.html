@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <title>우리나라 지도 색칠하기</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+  <style>
+    html, body { height:100vh; margin:0; padding:0; background:#ffffff; }
+    body { display:flex; flex-direction:column; }
+    #map { flex:1; }
+    #map { height:70%; margin:0; padding:0; background:#ffffff; }
+    body { display:flex; flex-direction:column; }
+    header { background:rgb(156, 218, 230); color:#fff; padding:10px; text-align:left; font-size:18px; }
+    #toolbar { background:#f8f8f8; padding:8px; display:flex; flex-wrap:wrap; gap:12px; align-items:center; border-bottom:1px solid #ddd; font-family:sans-serif; }
+    #toolbar button, #toolbar select, #toolbar input[type=color] { border:1px solid #ccc; background:white; border-radius:4px; padding:4px 8px; cursor:pointer; transition:background .2s, color .2s; }
+    #btn-sg.mode-sg { background:#007bff; color:#fff; font-weight:bold; border-color:#007bff; }
+    #btn-sg.mode-sg:hover { background:#0056b3; }
+    #btn-sg.mode-sd { background:#dc3545; color:#fff; font-weight:bold; border-color:#dc3545; }
+    #btn-sg.mode-sd:hover { background:#c82333; }
+    #toolbar .palette-box { width:20px; height:20px; border:1px solid #aaa; cursor:pointer; transition:transform .15s, border-color .15s; }
+    #toolbar .palette-box:hover { transform:scale(1.2); border-color:#333; }
+    #toolbar label { font-size:0.9rem; display:flex; align-items:center; gap:2px; }
+    #toolbar span.value { min-width:20px; text-align:right; display:inline-block; }
+    #toolbar input[type=range] { width:100px; }
+    .leaflet-control-zoom { display:none; }
+    #map.animated-fade { 
+      transition: opacity 0.4s cubic-bezier(.4,0,.2,1); 
+      opacity: 0.25; 
+      pointer-events: none;
+    }
+    #map.animated-fade-in {
+      transition: opacity 0.4s cubic-bezier(.4,0,.2,1); 
+      opacity: 1;
+      pointer-events: auto;
+    }
+    @media (max-width: 700px) {
+      header { font-size: 15px; padding: 8px; }
+      #toolbar { flex-wrap: wrap; gap: 8px; padding: 6px; font-size: 0.95em; overflow-x: auto; }
+      #toolbar button, #toolbar select, #toolbar input[type=color] { padding: 6px 10px; font-size: 1em; min-width: 36px; }
+      #toolbar label { flex-direction: column; align-items: flex-start; gap: 0; margin-bottom: 4px; }
+      #toolbar .palette-box { width: 28px; height: 28px; margin-bottom: 2px; }
+      #toolbar-zoom { flex-direction: row; min-width: 70px; }
+      #map { height: 62vh; min-height: 200px; }
+    }
+    @media (max-width: 480px) {
+      header { font-size: 12px; padding: 6px; }
+      #toolbar { font-size: 0.88em; gap: 5px; padding: 4px; }
+      #toolbar .palette-box { width: 22px; height: 22px; }
+      #map { height: 54vh; min-height: 120px; }
+    }
+    .leaflet-interactive:focus {
+      outline: none !important;
+      box-shadow: none !important;
+    }
+    /* 커스텀 툴팁 스타일 */
+    .map-custom-tooltip {
+      position: fixed;
+      pointer-events: none;
+      background: rgba(255,255,255,0.97);
+      border: 1.5px solid #333;
+      border-radius: 6px;
+      padding: 5px 16px;
+      font-size: 17px;
+      font-family: 'Noto Sans KR', sans-serif;
+      color: #222;
+      white-space: nowrap;
+      box-shadow: 2px 4px 12px rgba(0,0,0,0.09);
+      z-index: 9999;
+      transition: opacity .1s;
+      opacity: 0;
+      pointer-events: none;
+    }
+    .map-custom-tooltip.visible {
+      opacity: 1;
+    }
+  </style>
+</head>
+<body>
+  <header>우리나라 지도 색칠하기 🗺️🖌️🍺🍗🤪 v1.0 20250627</header>
+  <div id="toolbar">
+    <button id="btn-sg" class="mode-sg" aria-label="시군/시도 모드 토글" title="시군/시도 모드 토글">시군</button>
+    <label>색상:<input type="color" id="colorPicker" value="#FFD700" aria-label="색상 선택"></label>
+    <div id="paletteButtons" style="display:flex; gap:4px;">
+      <div class="palette-box" id="palette-custom" data-color="#444444" style="background:#444444" title="색상 #444444"></div>
+      <div class="palette-box" data-color="#777777" style="background:#777777" title="색상 #777777"></div>
+      <div class="palette-box" data-color="#aaaaaa" style="background:#aaaaaa" title="색상 #aaaaaa"></div>
+      <div class="palette-box" data-color="#dddddd" style="background:#dddddd" title="색상 #dddddd"></div>
+      <div class="palette-box" data-color="#f0f0f0" style="background:#f0f0f0" title="색상 #f0f0f0"></div>
+    </div>
+    <!-- 육지 색상 드롭박스 완전히 제거 -->
+    <label>시도 경계 굵기:<input type="range" id="slider-sd" min="1" max="10" step="0.5" value="1" aria-label="시도 경계 굵기 선택"><span class="value" id="sd-value">1.0</span>px</label>
+    <label>시군 경계 굵기:<input type="range" id="slider-sg" min="0.5" max="10" step="0.5" value="0.5" aria-label="시군 경계 굵기 선택"><span class="value" id="sg-value">0.5</span>px</label>
+    <button id="btn-base" aria-label="배경지도 켜기/끄기" title="배경지도 켜기/끄기">🌚 배경지도</button>
+    <div id="toolbar-zoom" style="display:flex; border:1px solid #ccc; border-radius:4px; overflow:hidden;">
+      <button id="zoom-in" aria-label="확대" title="확대(+0.1)" style="border:none; padding:4px 8px; background:white; cursor:pointer;">+</button>
+      <button id="zoom-out" aria-label="축소" title="축소(-0.1)" style="border:none; padding:4px 8px; background:white; cursor:pointer;">–</button>
+    </div>
+    <button id="btn-reset" aria-label="초기화" title="초기화">초기화</button>
+    <button id="savePng" aria-label="PNG 저장" title="PNG 저장">PNG 저장</button>
+    <label>확대 레벨:<span id="zoom-level">6.5</span></label>
+  </div>
+  <div id="map"></div>
+  <!-- 커스텀 툴팁용 div 추가 -->
+  <div id="map-custom-tooltip" class="map-custom-tooltip"></div>
+  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+  <script>
+    // --- 커스텀 툴팁 로직 ---
+    const tooltipDiv = document.getElementById('map-custom-tooltip');
+    function showCustomTooltip(html, event) {
+      tooltipDiv.innerHTML = html;
+      tooltipDiv.classList.add('visible');
+      // 마우스 좌표에 툴팁 위치(살짝 우상단으로)
+      const offsetX = 15, offsetY = 8;
+      // event는 leaflet의 MouseEvent (originalEvent로 접근)
+      const clientX = event.originalEvent.clientX, clientY = event.originalEvent.clientY;
+      tooltipDiv.style.left = (clientX + offsetX) + 'px';
+      tooltipDiv.style.top  = (clientY + offsetY) + 'px';
+    }
+    function hideCustomTooltip() {
+      tooltipDiv.classList.remove('visible');
+    }
+
+    // --- 전역 변수 및 초기화 ---
+    const initialCenter = [36.5, 127.8], initialZoom = 6.5;
+    const map = L.map('map', {
+      center: initialCenter,
+      zoom: initialZoom,
+      zoomSnap: 0,
+      zoomDelta: 0.1,
+      zoomControl: false,
+      attributionControl: false
+    });
+
+    let baseOn = false;
+    const baseLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 });
+    const btnBase = document.getElementById('btn-base');
+
+    let highlightFill = '#FFD700',
+        sgVisible = true,
+        defaultLandOpacity = 0.3;
+
+    const defaultStyle = {
+      sd: { color: '#444', weight: 1, fillColor: '#ffffff', fillOpacity: defaultLandOpacity, opacity: 1 },
+      sg: { color: '#444', weight: 0.5, fillOpacity: 0, opacity: 1 }
+    };
+
+    const coloredSd = new Map(),
+          coloredSg = new Map();
+    let sdLayer, sgLayer, sdBorderLayer;
+
+    // --- 툴바: 팔레트/컬러피커 동기화 ---
+    document.querySelectorAll('.palette-box').forEach(b => b.addEventListener('click', () => {
+      highlightFill = b.dataset.color;
+      document.getElementById('colorPicker').value = highlightFill;
+    }));
+
+    document.getElementById('colorPicker').addEventListener('input', e => {
+      highlightFill = e.target.value;
+      const customBox = document.getElementById('palette-custom');
+      customBox.dataset.color = highlightFill;
+      customBox.style.background = highlightFill;
+      customBox.title = `색상 ${highlightFill}`;
+    });
+
+    // --- 툴바: 지도 확대/축소 ---
+    document.getElementById('zoom-in').addEventListener('click', () => map.zoomIn(0.1));
+    document.getElementById('zoom-out').addEventListener('click', () => map.zoomOut(0.1));
+    map.on('zoomend', () => document.getElementById('zoom-level').textContent = map.getZoom().toFixed(1));
+
+    // --- 툴바: 베이스맵 토글 ---
+    btnBase.addEventListener('click', () => {
+      baseOn = !baseOn;
+      if (baseOn) {
+        map.addLayer(baseLayer);
+        btnBase.textContent = '🌝 배경지도';
+      } else {
+        map.removeLayer(baseLayer);
+        btnBase.textContent = '🌚 배경지도';
+      }
+    });
+
+    // --- 해양 영역(백그라운드 흰색) ---
+    map.createPane('seaPane');
+    map.getPane('seaPane').style.zIndex = 100;
+    L.rectangle([[-90, -180], [90, 180]], {
+      pane: 'seaPane',
+      interactive: false,
+      fillColor: '#ffffff',
+      fillOpacity: 1,
+      stroke: false
+    }).addTo(map);
+
+    // --- 스타일 함수 ---
+    function getSdStyle(layer) {
+      const id = layer._leaflet_id;
+      if (coloredSd.get(id)) {
+        return {
+          color: '#444',
+          weight: 2,
+          fillColor: highlightFill,
+          fillOpacity: 0.7,
+          opacity: 1
+        };
+      } else {
+        return {
+          ...defaultStyle.sd
+        };
+      }
+    }
+    function getSgStyle(layer) {
+      const id = layer._leaflet_id;
+      if (coloredSg.get(id)) {
+        return {
+          color: '#444',
+          weight: 1,
+          fillColor: highlightFill,
+          fillOpacity: 0.7,
+          opacity: 1
+        };
+      } else {
+        return {
+          ...defaultStyle.sg
+        };
+      }
+    }
+
+    // --- 색칠 토글 함수 ---
+    function toggleSdLayerColor(layer) {
+      const id = layer._leaflet_id;
+      const on = !coloredSd.get(id);
+      coloredSd.set(id, on);
+      layer.setStyle(getSdStyle(layer));
+    }
+    function toggleSgLayerColor(layer) {
+      const id = layer._leaflet_id;
+      const on = !coloredSg.get(id);
+      coloredSg.set(id, on);
+      layer.setStyle(getSgStyle(layer));
+    }
+
+    // --- 색상 일괄 초기화 함수 ---
+    function resetSdLayerColors() {
+      coloredSd.clear();
+      sdLayer.eachLayer(layer => layer.setStyle(getSdStyle(layer)));
+    }
+    function resetSgLayerColors() {
+      coloredSg.clear();
+      sgLayer.eachLayer(layer => layer.setStyle(getSgStyle(layer)));
+    }
+
+    // --- 강조효과(페이드) 함수 ---
+    function animateMapFade(cb) {
+      const mapDiv = document.getElementById('map');
+      mapDiv.classList.add('animated-fade');
+      setTimeout(() => {
+        cb(); // 레이어 토글 등 콜백
+        mapDiv.classList.remove('animated-fade');
+        mapDiv.classList.add('animated-fade-in');
+        setTimeout(() => mapDiv.classList.remove('animated-fade-in'), 400);
+      }, 300);
+    }
+
+    // --- GeoJSON 레이어 불러오기 및 생성 (커스텀 툴팁 적용) ---
+    Promise.all([
+      fetch('q_sd.json').then(r => r.json()),
+      fetch('q_sg.json').then(r => r.json())
+    ]).then(([sdJson, sgJson]) => {
+      sdLayer = L.geoJSON(sdJson, {
+        style: getSdStyle,
+        onEachFeature: (feature, layer) => {
+          // 클릭 이벤트
+          layer.on('click', () => {
+            if (!sgVisible) {
+              toggleSdLayerColor(layer);
+              sdBorderLayer.bringToFront();
+            }
+          });
+          // 커스텀 툴팁: 시도(CTP_KOR_NM)
+          if (feature.properties && feature.properties.CTP_KOR_NM) {
+            const name = feature.properties.CTP_KOR_NM;
+            layer.on('mouseover', e => showCustomTooltip(name, e));
+            layer.on('mousemove', e => showCustomTooltip(name, e));
+            layer.on('mouseout', hideCustomTooltip);
+          }
+        }
+      }).addTo(map);
+
+      sgLayer = L.geoJSON(sgJson, {
+        style: getSgStyle,
+        onEachFeature: (feature, layer) => {
+          // 클릭 이벤트
+          layer.on('click', () => {
+            if (sgVisible) {
+              toggleSgLayerColor(layer);
+              sdBorderLayer.bringToFront();
+            }
+          });
+          // 커스텀 툴팁: 시군(SIG_KOR_NM)
+          if (feature.properties && feature.properties.SIG_KOR_NM) {
+            const name = feature.properties.SIG_KOR_NM;
+            layer.on('mouseover', e => showCustomTooltip(name, e));
+            layer.on('mousemove', e => showCustomTooltip(name, e));
+            layer.on('mouseout', hideCustomTooltip);
+          }
+        }
+      }).addTo(map);
+
+      sdBorderLayer = L.geoJSON(sdJson, {
+        style: () => ({
+          color: '#222',
+          weight: parseFloat(document.getElementById('slider-sd').value),
+          fillOpacity: 0,
+          opacity: 1
+        }),
+        interactive: false
+      }).addTo(map);
+      sdBorderLayer.bringToFront();
+
+      map.fitBounds(L.featureGroup([sdLayer, sgLayer, sdBorderLayer]).getBounds(), { padding: [20, 20] });
+
+      // --- 시군/시도 토글 버튼 ---
+      document.getElementById('btn-sg').addEventListener('click', () => {
+        animateMapFade(() => {
+          sgVisible = !sgVisible;
+          const btn = document.getElementById('btn-sg');
+          if (sgVisible) {
+            btn.textContent = '시군';
+            btn.classList.add('mode-sg');
+            btn.classList.remove('mode-sd');
+            map.addLayer(sgLayer);
+            resetSdLayerColors();
+          } else {
+            btn.textContent = '시도';
+            btn.classList.add('mode-sd');
+            btn.classList.remove('mode-sg');
+            map.removeLayer(sgLayer);
+            resetSgLayerColors();
+          }
+          sdBorderLayer.bringToFront();
+        });
+      });
+
+      // --- 경계 굵기 슬라이더 ---
+      document.getElementById('slider-sd').addEventListener('input', e => {
+        const w = +e.target.value;
+        document.getElementById('sd-value').textContent = w.toFixed(1);
+        sdBorderLayer.setStyle({ weight: w });
+        sdBorderLayer.bringToFront();
+      });
+      document.getElementById('slider-sg').addEventListener('input', e => {
+        const w = +e.target.value;
+        document.getElementById('sg-value').textContent = w.toFixed(1);
+        sgLayer.setStyle({ weight: w });
+        sdBorderLayer.bringToFront();
+      });
+
+      // --- 초기화 ---
+      document.getElementById('btn-reset').addEventListener('click', () => location.reload());
+
+      // --- PNG 저장 (미구현 안내) ---
+      document.getElementById('savePng').addEventListener('click', () => alert('저장 기능을 만들다가 계속 실패. 😢😡😵‍💫 [shift]+[win]+[s]를 이용해주세요.'));
+    });
+  </script>
+<footer style="position: fixed; bottom: 8px; right: 12px; font-size: 9px; color: #888; z-index: 9999; background: rgba(255,255,255,0.6); padding: 2px 6px; border-radius: 4px;">
+  <a href="https://geotasoo.com" target="_blank" style="color: inherit; text-decoration: none;">@geotasoo</a>
+</footer>
+</body>
+</html>
