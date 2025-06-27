@@ -11,7 +11,21 @@
     #map { flex:1; }
     #map { height:70%; margin:0; padding:0; background:#ffffff; }
     body { display:flex; flex-direction:column; }
-    header { background:rgb(156, 218, 230); color:#fff; padding:10px; text-align:left; font-size:18px; }
+    header {
+      background:rgb(156, 218, 230);
+      color:#fff;
+      padding:10px;
+      font-size:18px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    /* "의견 남기기" 언더라인 없애기 */
+    header a {
+      color: #fff;
+      font-size: 15px;
+      text-decoration: none;
+    }
     #toolbar { background:#f8f8f8; padding:8px; display:flex; flex-wrap:wrap; gap:12px; align-items:center; border-bottom:1px solid #ddd; font-family:sans-serif; }
     #toolbar button, #toolbar select, #toolbar input[type=color] { border:1px solid #ccc; background:white; border-radius:4px; padding:4px 8px; cursor:pointer; transition:background .2s, color .2s; }
     #btn-sg.mode-sg { background:#007bff; color:#fff; font-weight:bold; border-color:#007bff; }
@@ -77,7 +91,13 @@
   </style>
 </head>
 <body>
-  <header>우리나라 지도 색칠하기 🗺️🖌️🍺🍗🤪 v1.0 20250627</header>
+  <header>
+    <span>우리나라 지도 색칠하기 🗺️🖌️🍺🍗🤪 v1.0 20250627</span>
+    <a href="https://forms.gle/Bn5vasnSx5F7fiEQ7"
+       target="_blank">
+      🎤🐔💬
+    </a>
+  </header>
   <div id="toolbar">
     <button id="btn-sg" class="mode-sg" aria-label="시군/시도 모드 토글" title="시군/시도 모드 토글">시군</button>
     <label>색상:<input type="color" id="colorPicker" value="#FFD700" aria-label="색상 선택"></label>
@@ -88,7 +108,6 @@
       <div class="palette-box" data-color="#dddddd" style="background:#dddddd" title="색상 #dddddd"></div>
       <div class="palette-box" data-color="#f0f0f0" style="background:#f0f0f0" title="색상 #f0f0f0"></div>
     </div>
-    <!-- 육지 색상 드롭박스 완전히 제거 -->
     <label>시도 경계 굵기:<input type="range" id="slider-sd" min="1" max="10" step="0.5" value="1" aria-label="시도 경계 굵기 선택"><span class="value" id="sd-value">1.0</span>px</label>
     <label>시군 경계 굵기:<input type="range" id="slider-sg" min="0.5" max="10" step="0.5" value="0.5" aria-label="시군 경계 굵기 선택"><span class="value" id="sg-value">0.5</span>px</label>
     <button id="btn-base" aria-label="배경지도 켜기/끄기" title="배경지도 켜기/끄기">🌚 배경지도</button>
@@ -157,10 +176,7 @@
 
     document.getElementById('colorPicker').addEventListener('input', e => {
       highlightFill = e.target.value;
-      const customBox = document.getElementById('palette-custom');
-      customBox.dataset.color = highlightFill;
-      customBox.style.background = highlightFill;
-      customBox.title = `색상 ${highlightFill}`;
+      // 첫 번째 팔레트(palette-custom)는 더이상 바꾸지 않음!
     });
 
     // --- 툴바: 지도 확대/축소 ---
