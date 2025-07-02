@@ -45,8 +45,6 @@
       opacity: 1;
       pointer-events: auto;
     }
-
-    /* --- 드롭다운 멀티체크박스 --- */
     .dropdown {
       position: relative;
       display: inline-block;
@@ -157,7 +155,7 @@
 </head>
 <body>
   <header>
-    <span>우리나라 지도 색칠하기 🎗️🗺️🖌️🍺🍗🤪 v1.5 20250628</span>
+    <span>우리나라 지도 색칠하기 🎗️🗺️🖌️🍺🍗🤪 v1.6 20250702</span>
     <a href="https://forms.gle/Bn5vasnSx5F7fiEQ7"
        target="_blank">
       🤩
@@ -202,6 +200,11 @@
   <div id="map-custom-tooltip" class="map-custom-tooltip"></div>
   <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
   <script>
+    // --- 타이틀 클릭 시 초기화 버튼 클릭 ---
+    document.querySelector('header span').addEventListener('click', function () {
+      document.getElementById('btn-reset').click();
+    });
+
     // --- 커스텀 툴팁 로직 ---
     const tooltipDiv = document.getElementById('map-custom-tooltip');
     function showCustomTooltip(html, event) {
