@@ -159,13 +159,59 @@
   </style>
 </head>
 <body>
-  <header>
-    <span>우리나라 지도 색칠하기 🎗️🗺️🖌️🍺🍗🤪 v1.6 20250702</span>
-    <a href="https://forms.gle/Bn5vasnSx5F7fiEQ7"
-       target="_blank">
-      📝
-    </a>
-  </header>
+ <header style="background: pink; color: #fff; padding: 10px; font-size: 18px; display: flex; justify-content: space-between; align-items: center; position: relative;">
+  <span>우리나라 지도 색칠하기 🎗️🗺️🖌️🍺🍗🤪 v1.6 20250702</span>
+  <div id="iconLinks" style="display: flex; gap: 12px; align-items: center; position: relative;">
+    <a href="https://forms.gle/Bn5vasnSx5F7fiEQ7" target="_blank" data-tip="생각보내기" style="color: #fff; font-size: 18px; text-decoration: none;">📝</a>
+    <a href="https://buymeacoffee.com/geotasoo" target="_blank" data-tip="커피보내기" style="color: #fff; font-size: 18px; text-decoration: none;">☕</a>
+    <a href="https://geotasoo.com/2025/06/28/%ec%9a%b0%eb%a6%ac%eb%82%98%eb%9d%bc-%ec%a7%80%eb%8f%84-%ec%83%89%ec%b9%a0%ed%95%98%ea%b8%b0-%ec%9b%b9%ed%8e%98%ec%9d%b4%ec%a7%80//" target="_blank" data-tip="사용법보기" style="color: #fff; font-size: 18px; text-decoration: none;">🏃🏻‍➡️</a>
+    <div id="linkTooltip" style="display:none; position:fixed; background:rgba(0,0,0,0.85); color:#fff; font-size:12px; padding:4px 6px; border-radius:4px; white-space:nowrap; pointer-events:none; z-index:9999;"></div>
+  </div>
+</header>
+
+<script>
+  (function () {
+    const links = document.querySelectorAll('#iconLinks a');
+    const tooltip = document.getElementById('linkTooltip');
+
+    links.forEach(link => {
+      link.addEventListener('pointerenter', () => {
+        tooltip.textContent = link.dataset.tip || '';
+        tooltip.style.display = 'block';
+      });
+
+      link.addEventListener('pointermove', (e) => {
+        const vw = window.innerWidth;
+        const vh = window.innerHeight;
+
+        // 기본 위치: 커서 왼쪽 아래
+        let x = e.clientX - tooltip.offsetWidth - 10;
+        let y = e.clientY + 20;
+
+        // 경계 보정 ①: 왼쪽 밖으로 나가면 오른쪽 아래로
+        if (x < 0) x = e.clientX + 15;
+
+        // 경계 보정 ②: 오른쪽 밖으로 나가면 살짝 왼쪽으로
+        if (x + tooltip.offsetWidth > vw) x = Math.max(5, vw - tooltip.offsetWidth - 5);
+
+        // 경계 보정 ③: 아래로 넘치면 커서 위쪽으로
+        if (y + tooltip.offsetHeight > vh) y = e.clientY - tooltip.offsetHeight - 12;
+
+        // 최종 보정(최소 여백)
+        x = Math.max(5, x);
+        y = Math.max(5, y);
+
+        tooltip.style.left = x + 'px';
+        tooltip.style.top  = y + 'px';
+      });
+
+      link.addEventListener('pointerleave', () => {
+        tooltip.style.display = 'none';
+      });
+    });
+  })();
+</script>
+
   <div id="toolbar">
     <button id="btn-sg" class="mode-sg" aria-label="시군/시도 모드 토글" title="시군/시도 모드 토글">시군</button>
     <!-- 드롭다운 시도 선택 -->
@@ -566,3 +612,4 @@
 </footer>
 </body>
 </html>
+
