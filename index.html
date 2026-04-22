@@ -463,18 +463,19 @@ Promise.all([
   ===== 이스터에그: ⚾ 숫자야구 =====
  
 -->
+
 <style>
 #nb-overlay {
   display:none; position:fixed; inset:0; z-index:99999;
-  background:rgba(0,0,0,0.72); backdrop-filter:blur(6px);
+  background:rgba(0,0,0,0.5); backdrop-filter:blur(4px);
   justify-content:center; align-items:center;
   font-family:'Courier New', monospace;
 }
 #nb-overlay.active { display:flex; }
 #nb-box {
-  background:#1a1a2e; border-radius:16px; overflow:hidden;
+  background:#f5f5f5; border-radius:16px; overflow:hidden;
   width:400px; max-width:95vw; max-height:92vh;
-  box-shadow:0 0 40px rgba(78,204,163,0.2), 0 20px 60px rgba(0,0,0,0.6);
+  box-shadow:0 8px 32px rgba(0,0,0,0.2);
   animation:nbIn .35s cubic-bezier(.22,.68,0,1.15);
   display:flex; flex-direction:column;
 }
@@ -482,115 +483,115 @@ Promise.all([
 
 /* 헤더 */
 #nb-head {
-  background:linear-gradient(135deg,#16213e,#0f3460);
+  background:linear-gradient(135deg,#2E7D5E,#4CAF50);
   padding:12px 18px; display:flex; justify-content:space-between; align-items:center;
-  border-bottom:2px solid #4ecca3; flex-shrink:0;
+  border-bottom:2px solid #2E7D5E; flex-shrink:0;
 }
-#nb-head .nh-title { color:#4ecca3; font-size:15px; font-weight:bold; letter-spacing:1px; }
-#nb-head .nh-meta { color:#ccc; font-size:12px; display:flex; gap:12px; }
-#nb-head .nh-meta span b { color:#4ecca3; }
-#nb-close { background:none; border:none; color:#ff6b6b; font-size:20px; cursor:pointer; padding:0 2px; }
-#nb-close:hover { color:#ff9090; }
+#nb-head .nh-title { color:#fff; font-size:15px; font-weight:bold; letter-spacing:1px; }
+#nb-head .nh-meta { color:#e8f5e9; font-size:12px; display:flex; gap:12px; }
+#nb-head .nh-meta span b { color:#fff; }
+#nb-close { background:none; border:none; color:#fff; font-size:20px; cursor:pointer; padding:0 2px; opacity:0.9; }
+#nb-close:hover { opacity:1; }
 
 /* 입력 영역 */
-#nb-input-area { padding:16px 18px 12px; flex-shrink:0; border-bottom:1px solid #2a3a5a; }
+#nb-input-area { padding:16px 18px 12px; flex-shrink:0; border-bottom:1px solid #ddd; background:#fff; }
 #nb-display {
   display:flex; gap:8px; justify-content:center; margin-bottom:12px;
 }
 .nb-digit {
   width:52px; height:60px; border-radius:10px;
-  border:2px solid #3a4a6a; background:#161b28;
+  border:2px solid #bbb; background:#fafafa;
   display:flex; align-items:center; justify-content:center;
-  font-size:28px; font-weight:bold; color:#4ecca3;
-  transition:border-color .15s, box-shadow .15s;
+  font-size:28px; font-weight:bold; color:#2E7D5E;
+  transition:all .15s;
   position:relative;
 }
-.nb-digit.active { border-color:#4ecca3; box-shadow:0 0 10px rgba(78,204,163,0.3); }
-.nb-digit.filled { border-color:#4ecca3; color:#fff; }
+.nb-digit.active { border-color:#2E7D5E; box-shadow:0 0 0 3px rgba(46,125,94,0.1); background:#fff; }
+.nb-digit.filled { border-color:#2E7D5E; color:#1a4d3a; background:#e8f5e9; }
 .nb-digit .nd-label {
-  position:absolute; top:3px; left:6px; font-size:9px; color:#666; font-family:sans-serif;
+  position:absolute; top:3px; left:6px; font-size:9px; color:#999; font-family:sans-serif;
 }
 
 /* 숫자 버튼 */
 #nb-numpad { display:grid; grid-template-columns:repeat(5,1fr); gap:6px; margin-bottom:10px; }
 .nb-num {
-  padding:10px 0; border-radius:8px; border:1px solid #3a4a6a;
-  background:#161b28; color:#ddd; font-size:16px; font-weight:bold;
+  padding:10px 0; border-radius:8px; border:1px solid #ccc;
+  background:#fff; color:#333; font-size:16px; font-weight:bold;
   cursor:pointer; text-align:center; transition:all .15s; font-family:'Courier New',monospace;
 }
-.nb-num:hover { background:#1f2a44; border-color:#4ecca3; color:#fff; }
+.nb-num:hover { background:#2E7D5E; border-color:#2E7D5E; color:#fff; }
 .nb-num:active { transform:scale(0.93); }
-.nb-num.used { opacity:0.25; pointer-events:none; }
+.nb-num.used { opacity:0.3; pointer-events:none; }
 
 /* 액션 버튼 */
 #nb-actions { display:flex; gap:8px; }
 #nb-del {
-  flex:1; padding:10px; border-radius:8px; border:1px solid #4a2a2a;
-  background:#2a1515; color:#ff6b6b; font-size:13px; cursor:pointer;
+  flex:1; padding:10px; border-radius:8px; border:1px solid #ddd;
+  background:#fff; color:#e53935; font-size:13px; cursor:pointer;
   font-family:'Courier New',monospace; transition:all .15s; font-weight:bold;
 }
-#nb-del:hover { background:#3a2020; border-color:#ff6b6b; }
+#nb-del:hover { background:#ffebee; border-color:#e53935; }
 #nb-submit {
-  flex:2; padding:10px; border-radius:8px; border:2px solid #4ecca3;
-  background:#0f3460; color:#4ecca3; font-size:13px; font-weight:bold;
+  flex:2; padding:10px; border-radius:8px; border:2px solid #2E7D5E;
+  background:#2E7D5E; color:#fff; font-size:13px; font-weight:bold;
   cursor:pointer; font-family:'Courier New',monospace; transition:all .15s;
   opacity:0.4; pointer-events:none;
 }
 #nb-submit.ready { opacity:1; pointer-events:auto; }
-#nb-submit.ready:hover { background:#4ecca3; color:#0d1117; }
+#nb-submit.ready:hover { background:#256b4e; }
 
 /* 기록 */
 #nb-history-wrap {
-  flex:1; overflow-y:auto; padding:10px 18px 14px;
-  scrollbar-width:thin; scrollbar-color:#2a3a5a transparent;
+  flex:1; overflow-y:auto; padding:10px 18px 14px; background:#fafafa;
+  scrollbar-width:thin; scrollbar-color:#ccc transparent;
 }
 #nb-history-wrap::-webkit-scrollbar { width:4px; }
-#nb-history-wrap::-webkit-scrollbar-thumb { background:#2a3a5a; border-radius:2px; }
-.nb-hist-empty { color:#666; font-size:12px; text-align:center; padding:20px 0; }
+#nb-history-wrap::-webkit-scrollbar-thumb { background:#ccc; border-radius:2px; }
+.nb-hist-empty { color:#999; font-size:12px; text-align:center; padding:20px 0; }
 .nb-hist-row {
   display:flex; align-items:center; gap:10px;
   padding:6px 10px; border-radius:6px; margin-bottom:4px;
-  background:#161b28; border:1px solid #2a3a5a;
+  background:#fff; border:1px solid #e0e0e0;
   font-size:13px; animation:histIn .2s ease;
 }
 @keyframes histIn { from{opacity:0;transform:translateX(-8px)} to{opacity:1;transform:none} }
 .nb-hist-row .hr-num { color:#999; font-size:11px; min-width:20px; }
-.nb-hist-row .hr-guess { color:#fff; font-weight:bold; letter-spacing:3px; flex:1; }
+.nb-hist-row .hr-guess { color:#222; font-weight:bold; letter-spacing:3px; flex:1; }
 .nb-hist-row .hr-result { display:flex; gap:6px; }
-.hr-s { color:#4ecca3; font-weight:bold; font-size:13px; }
-.hr-b { color:#f39c12; font-weight:bold; font-size:13px; }
-.hr-out { color:#888; font-size:12px; }
+.hr-s { color:#2E7D5E; font-weight:bold; font-size:13px; }
+.hr-b { color:#f57c00; font-weight:bold; font-size:13px; }
+.hr-out { color:#999; font-size:12px; }
 
 /* 기록 패널 (최고기록) */
-#nb-records-wrap { padding:0 18px 14px; flex-shrink:0; border-top:1px solid #2a3a5a; }
-#nb-records-title { color:#888; font-size:10px; padding:8px 0 4px; letter-spacing:1px; }
+#nb-records-wrap { padding:0 18px 14px; flex-shrink:0; border-top:1px solid #ddd; background:#fafafa; }
+#nb-records-title { color:#666; font-size:10px; padding:8px 0 4px; letter-spacing:1px; }
 #nb-records-list { display:flex; gap:6px; flex-wrap:wrap; }
 .nb-rec-chip {
-  background:#161b28; border:1px solid #2a3a5a; border-radius:20px;
-  padding:3px 10px; font-size:11px; color:#aaa;
+  background:#fff; border:1px solid #e0e0e0; border-radius:20px;
+  padding:3px 10px; font-size:11px; color:#666;
 }
-.nb-rec-chip b { color:#4ecca3; }
+.nb-rec-chip b { color:#2E7D5E; }
 
 /* 정답 오버레이 */
 #nb-win {
   display:none; position:absolute; inset:0; z-index:10;
-  background:rgba(10,10,26,0.92); flex-direction:column;
+  background:rgba(255,255,255,0.96); flex-direction:column;
   justify-content:center; align-items:center; text-align:center;
   border-radius:16px;
 }
 #nb-win.show { display:flex; }
 #nb-win .nw-emoji { font-size:56px; margin-bottom:10px; animation:nwPop .5s cubic-bezier(.22,.68,0,1.4); }
-#nb-win .nw-title { color:#4ecca3; font-size:22px; font-weight:bold; margin-bottom:6px; }
-#nb-win .nw-detail { color:#bbb; font-size:13px; margin-bottom:24px; line-height:1.8; }
+#nb-win .nw-title { color:#2E7D5E; font-size:22px; font-weight:bold; margin-bottom:6px; }
+#nb-win .nw-detail { color:#555; font-size:13px; margin-bottom:24px; line-height:1.8; }
 #nb-win .nw-btns { display:flex; gap:10px; }
 #nb-win button {
   padding:10px 22px; border-radius:8px; font-size:13px; font-weight:bold;
   cursor:pointer; font-family:'Courier New',monospace; border:none;
 }
-#nw-retry { background:#4ecca3; color:#0d1117; }
-#nw-retry:hover { background:#3ab890; }
-#nw-close-win { background:#2a3a5a; color:#bbb; }
-#nw-close-win:hover { background:#3a4a70; color:#fff; }
+#nw-retry { background:#2E7D5E; color:#fff; }
+#nw-retry:hover { background:#256b4e; }
+#nw-close-win { background:#ddd; color:#555; }
+#nw-close-win:hover { background:#ccc; color:#333; }
 @keyframes nwPop { from{transform:scale(0.3) rotate(-20deg);opacity:0} to{transform:none;opacity:1} }
 
 /* 폭죽 캔버스 */
@@ -629,7 +630,7 @@ Promise.all([
 
     <div id="nb-records-wrap">
       <div id="nb-records-title">🏆 최고 기록 (시도 횟수 기준)</div>
-      <div id="nb-records-list"><span style="color:#666;font-size:11px;">아직 기록 없음</span></div>
+      <div id="nb-records-list"><span style="color:#999;font-size:11px;">아직 기록 없음</span></div>
     </div>
 
     <div id="nb-win">
@@ -681,7 +682,7 @@ Promise.all([
   /* ── 입력 ── */
   function inputDigit(n){
     if(current.length>=3) return;
-    if(current.includes(n)) return; // 중복 방지
+    if(current.includes(n)) return;
     current.push(n);
     updateDisplay();
     if(current.length===3){ submitBtn.classList.add('ready'); }
@@ -706,7 +707,6 @@ Promise.all([
         if(i === current.length) d.classList.add('active');
       }
     });
-    // 이미 사용된 숫자 표시
     document.querySelectorAll('.nb-num').forEach(function(btn){
       var n = parseInt(btn.dataset.n);
       if(current.includes(n)) btn.classList.add('used');
@@ -734,7 +734,6 @@ Promise.all([
   document.getElementById('nw-close-win').addEventListener('click', closeGame);
 
   function startNew(){
-    // 정답 생성 (중복 없는 3자리)
     var pool=[0,1,2,3,4,5,6,7,8,9];
     answer=[];
     while(answer.length<3){
@@ -792,7 +791,6 @@ Promise.all([
     }
     row.innerHTML='<span class="hr-num">'+n+'.</span><span class="hr-guess">'+guess.split('').join(' ')+'</span><span class="hr-result">'+res+'</span>';
     histList.appendChild(row);
-    // 스크롤 아래로
     var wrap = document.getElementById('nb-history-wrap');
     wrap.scrollTop = wrap.scrollHeight;
   }
@@ -800,7 +798,7 @@ Promise.all([
   /* ── 승리 ── */
   function showWin(tries, elapsed){
     var msg = tries<=3 ? '🌟 천재 야구선수!' : tries<=6 ? '👏 훌륭해요!' : tries<=9 ? '😄 잘했어요!' : '😅 고생했어요!';
-    nwDetail.innerHTML = '정답: <b style="color:#4ecca3;font-size:20px;letter-spacing:4px;">'+answer.join(' ')+'</b><br>시도 <b style="color:#fff;">'+tries+'</b>번 &nbsp;|&nbsp; <b style="color:#fff;">'+elapsed+'</b>초<br><span style="color:#4ecca3;">'+msg+'</span>';
+    nwDetail.innerHTML = '정답: <b style="color:#2E7D5E;font-size:20px;letter-spacing:4px;">'+answer.join(' ')+'</b><br>시도 <b style="color:#333;">'+tries+'</b>번 &nbsp;|&nbsp; <b style="color:#333;">'+elapsed+'</b>초<br><span style="color:#2E7D5E;">'+msg+'</span>';
     winEl.classList.add('show');
     startConfetti();
   }
@@ -816,7 +814,7 @@ Promise.all([
 
   function renderRecords(){
     var el = document.getElementById('nb-records-list');
-    if(!records.length){ el.innerHTML='<span style="color:#666;font-size:11px;">아직 기록 없음</span>'; return; }
+    if(!records.length){ el.innerHTML='<span style="color:#999;font-size:11px;">아직 기록 없음</span>'; return; }
     el.innerHTML = records.map(function(r,i){
       return '<span class="nb-rec-chip">'+['🥇','🥈','🥉','4위','5위'][i]+' <b>'+r.tries+'번</b> '+r.elapsed+'s</span>';
     }).join('');
@@ -824,7 +822,7 @@ Promise.all([
 
   /* ── 폭죽 ── */
   var confParticles=[], confRunning=false, confAnimId=null;
-  var CONF_COLORS=['#4ecca3','#f39c12','#e74c3c','#3498db','#9b59b6','#fff','#f1c40f'];
+  var CONF_COLORS=['#2E7D5E','#4CAF50','#f57c00','#1976d2','#7b1fa2','#e53935','#fbc02d'];
 
   function startConfetti(){
     var box = document.getElementById('nb-box');
@@ -879,6 +877,5 @@ Promise.all([
   renderRecords();
 })();
 </script>
-  
 </body>
 </html>
