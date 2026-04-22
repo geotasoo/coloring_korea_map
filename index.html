@@ -457,5 +457,387 @@ Promise.all([
 });
 });
 </script>
+
+  <!-- 
+  ===== 이스터에그: 🏃 달리기 게임 =====
+  헤더 타이틀을 빠르게 5번 클릭하면 게임이 나타납니다.
+  이 코드 전체를 기존 HTML의 </body> 바로 앞에 붙여넣으세요.
+-->
+<style>
+#runner-overlay {
+  display:none; position:fixed; inset:0; z-index:99999;
+  background:rgba(0,0,0,0.7); backdrop-filter:blur(4px);
+  justify-content:center; align-items:center;
+  font-family:'Courier New', monospace;
+}
+#runner-overlay.active { display:flex; }
+#runner-box {
+  background:#1a1a2e; border-radius:12px; padding:0; width:640px; max-width:95vw;
+  box-shadow:0 0 40px rgba(78,204,163,0.3), 0 20px 60px rgba(0,0,0,0.5);
+  overflow:hidden; position:relative;
+  animation: runnerSlideIn .35s cubic-bezier(.22,.68,0,1.15);
+}
+@keyframes runnerSlideIn { from{transform:translateY(30px) scale(0.96);opacity:0} to{transform:translateY(0) scale(1);opacity:1} }
+#runner-top {
+  background:linear-gradient(135deg,#16213e,#0f3460);
+  padding:12px 18px; display:flex; justify-content:space-between; align-items:center;
+  border-bottom:2px solid #4ecca3;
+}
+#runner-top span { color:#4ecca3; font-size:15px; font-weight:bold; letter-spacing:1px; }
+#runner-top .runner-score-display { color:#e8e8e8; font-size:13px; }
+#runner-close {
+  background:none; border:none; color:#e74c3c; font-size:20px;
+  cursor:pointer; line-height:1; padding:0 4px;
+}
+#runner-close:hover { color:#ff6b6b; }
+#runner-canvas-wrap {
+  position:relative; background:#0a0a1a;
+  border-bottom:2px solid #4ecca3;
+}
+#runner-canvas-wrap::after {
+  content:''; position:absolute; inset:0; pointer-events:none;
+  background:repeating-linear-gradient(
+    0deg, transparent, transparent 2px, rgba(78,204,163,0.03) 2px, rgba(78,204,163,0.03) 4px
+  );
+}
+#runnerCanvas { display:block; width:100%; image-rendering:pixelated; }
+#runner-bottom {
+  padding:10px 18px; display:flex; justify-content:space-between; align-items:center;
+  background:#16213e;
+}
+#runner-bottom .runner-hint { color:#555; font-size:11px; }
+#runner-bottom .runner-best { color:#4ecca3; font-size:12px; }
+#runner-start-screen {
+  position:absolute; inset:0; display:flex; flex-direction:column;
+  justify-content:center; align-items:center; background:rgba(10,10,26,0.92);
+  z-index:2; cursor:pointer;
+}
+#runner-start-screen .start-title { color:#4ecca3; font-size:22px; font-weight:bold; margin-bottom:8px; letter-spacing:2px; }
+#runner-start-screen .start-sub { color:#888; font-size:13px; margin-bottom:20px; }
+#runner-start-screen .start-key {
+  color:#fff; font-size:14px; background:#0f3460; border:1px solid #4ecca3;
+  padding:8px 24px; border-radius:6px; animation:startBlink 1.2s infinite;
+}
+@keyframes startBlink { 0%,100%{opacity:1} 50%{opacity:0.4} }
+</style>
+
+<div id="runner-overlay">
+  <div id="runner-box">
+    <div id="runner-top">
+      <span>🏃 RUNNER</span>
+      <span class="runner-score-display">SCORE: <span id="runner-score">0</span></span>
+      <button id="runner-close" title="닫기">✕</button>
+    </div>
+    <div id="runner-canvas-wrap">
+      <canvas id="runnerCanvas" width="600" height="200"></canvas>
+      <div id="runner-start-screen">
+        <div class="start-title">🏃 RUNNER</div>
+        <div class="start-sub">장애물을 피해 달려보세요!</div>
+        <div class="start-key">SPACE 또는 TAP</div>
+      </div>
+    </div>
+    <div id="runner-bottom">
+      <span class="runner-hint">Space / 화면터치 = 점프</span>
+      <span class="runner-best">BEST: <span id="runner-best">0</span></span>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  /* ── 헤더 5연타 감지 ── */
+  let tapCount = 0, tapTimer = null;
+  const headerSpan = document.querySelector('header span');
+  if(headerSpan){
+    headerSpan.addEventListener('click', function(e){
+      e.stopPropagation();
+      tapCount++;
+      clearTimeout(tapTimer);
+      tapTimer = setTimeout(()=>{ tapCount=0; }, 1200);
+      if(tapCount >= 5){
+        tapCount = 0;
+        openRunner();
+      }
+    });
+  }
+
+  /* ── 게임 상태 ── */
+  const overlay = document.getElementById('runner-overlay');
+  const canvas = document.getElementById('runnerCanvas');
+  const ctx = canvas.getContext('2d');
+  const startScreen = document.getElementById('runner-start-screen');
+  const scoreEl = document.getElementById('runner-score');
+  const bestEl = document.getElementById('runner-best');
+
+  let running = false, gameOver = false, started = false;
+  let score = 0, best = 0, speed = 4, frame = 0;
+  let animId = null;
+
+  // 플레이어
+  const P = { x:60, y:0, vy:0, w:20, h:36, jumping:false, runFrame:0 };
+  const GROUND = 160;
+  const GRAVITY = 0.7;
+  const JUMP = -12;
+
+  // 장애물
+  let obstacles = [];
+  let nextSpawn = 80;
+
+  function openRunner(){
+    overlay.classList.add('active');
+    resetGame();
+    startScreen.style.display = 'flex';
+    drawStatic();
+  }
+
+  function closeRunner(){
+    overlay.classList.remove('active');
+    running = false;
+    if(animId) cancelAnimationFrame(animId);
+  }
+
+  document.getElementById('runner-close').addEventListener('click', closeRunner);
+  overlay.addEventListener('click', function(e){
+    if(e.target === overlay) closeRunner();
+  });
+
+  function resetGame(){
+    score = 0; speed = 4; frame = 0; gameOver = false;
+    P.y = GROUND; P.vy = 0; P.jumping = false; P.runFrame = 0;
+    obstacles = [];
+    nextSpawn = 80;
+    scoreEl.textContent = '0';
+  }
+
+  function startGame(){
+    if(running) return;
+    started = true;
+    startScreen.style.display = 'none';
+    resetGame();
+    running = true;
+    loop();
+  }
+
+  /* ── 입력 ── */
+  function doJump(){
+    if(!started){
+      startGame();
+      return;
+    }
+    if(gameOver){
+      resetGame();
+      running = true;
+      loop();
+      return;
+    }
+    if(!P.jumping){
+      P.vy = JUMP;
+      P.jumping = true;
+    }
+  }
+
+  document.addEventListener('keydown', function(e){
+    if(!overlay.classList.contains('active')) return;
+    if(e.code === 'Space' || e.code === 'ArrowUp'){
+      e.preventDefault();
+      doJump();
+    }
+  });
+  canvas.addEventListener('click', doJump);
+  canvas.parentElement.querySelector('#runner-start-screen').addEventListener('click', function(e){
+    e.stopPropagation();
+    doJump();
+  });
+
+  /* ── 캐릭터 그리기 (픽셀 스틱맨) ── */
+  function drawPlayer(x, y, runFrame){
+    ctx.fillStyle = '#4ecca3';
+    // 머리
+    ctx.beginPath();
+    ctx.arc(x + 10, y - 30, 6, 0, Math.PI*2);
+    ctx.fill();
+    // 몸통
+    ctx.strokeStyle = '#4ecca3';
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    ctx.moveTo(x+10, y-24);
+    ctx.lineTo(x+10, y-10);
+    ctx.stroke();
+    // 팔
+    const armSwing = Math.sin(runFrame * 0.3) * 6;
+    ctx.beginPath();
+    ctx.moveTo(x+10, y-20);
+    ctx.lineTo(x+2+armSwing, y-13);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(x+10, y-20);
+    ctx.lineTo(x+18-armSwing, y-13);
+    ctx.stroke();
+    // 다리
+    if(P.jumping){
+      // 점프 중 다리 모아
+      ctx.beginPath(); ctx.moveTo(x+10,y-10); ctx.lineTo(x+5,y); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(x+10,y-10); ctx.lineTo(x+15,y); ctx.stroke();
+    } else {
+      const legSwing = Math.sin(runFrame * 0.3) * 8;
+      ctx.beginPath(); ctx.moveTo(x+10,y-10); ctx.lineTo(x+4+legSwing,y); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(x+10,y-10); ctx.lineTo(x+16-legSwing,y); ctx.stroke();
+    }
+  }
+
+  /* ── 장애물 그리기 (삼각 바리케이드) ── */
+  function drawObstacle(ob){
+    ctx.fillStyle = '#e74c3c';
+    // 삼각형 장애물
+    ctx.beginPath();
+    ctx.moveTo(ob.x, GROUND);
+    ctx.lineTo(ob.x + ob.w/2, GROUND - ob.h);
+    ctx.lineTo(ob.x + ob.w, GROUND);
+    ctx.closePath();
+    ctx.fill();
+    // 경고 줄무늬
+    ctx.strokeStyle = '#ff6b6b';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(ob.x + ob.w*0.25, GROUND - ob.h*0.3);
+    ctx.lineTo(ob.x + ob.w*0.75, GROUND - ob.h*0.3);
+    ctx.stroke();
+  }
+
+  /* ── 배경 ── */
+  function drawBg(){
+    ctx.fillStyle = '#0a0a1a';
+    ctx.fillRect(0, 0, 600, 200);
+    // 별
+    ctx.fillStyle = '#333';
+    for(let i=0; i<20; i++){
+      const sx = (i*137 + frame*0.3) % 600;
+      const sy = (i*73) % 120;
+      ctx.fillRect(sx, sy, 1.5, 1.5);
+    }
+    // 지면
+    ctx.strokeStyle = '#4ecca3';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(0, GROUND+1);
+    ctx.lineTo(600, GROUND+1);
+    ctx.stroke();
+    // 지면 점선
+    ctx.strokeStyle = '#1a3a2a';
+    ctx.setLineDash([4,8]);
+    const offset = -(frame * speed) % 12;
+    ctx.beginPath();
+    ctx.moveTo(offset, GROUND+8);
+    ctx.lineTo(600, GROUND+8);
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
+
+  /* ── 충돌 ── */
+  function checkCollision(ob){
+    // 삼각형 간이 판정 (사각형 축소)
+    const px = P.x+4, py = P.y-34, pw = 12, ph = 34;
+    const ox = ob.x+4, oy = GROUND-ob.h+4, ow = ob.w-8, oh = ob.h-4;
+    return px < ox+ow && px+pw > ox && py < oy+oh && py+ph > oy;
+  }
+
+  /* ── 정적 화면 ── */
+  function drawStatic(){
+    drawBg();
+    P.y = GROUND;
+    P.runFrame = 0;
+    drawPlayer(P.x, P.y, 0);
+  }
+
+  /* ── 게임 루프 ── */
+  function loop(){
+    if(!running) return;
+    frame++;
+
+    // 속도 점점 증가
+    speed = 4 + Math.floor(score / 5) * 0.5;
+    if(speed > 12) speed = 12;
+
+    // 물리
+    P.vy += GRAVITY;
+    P.y += P.vy;
+    if(P.y >= GROUND){
+      P.y = GROUND;
+      P.vy = 0;
+      P.jumping = false;
+    }
+    if(!P.jumping) P.runFrame++;
+
+    // 장애물 스폰
+    nextSpawn--;
+    if(nextSpawn <= 0){
+      const h = 20 + Math.random()*20;
+      const w = 14 + Math.random()*10;
+      obstacles.push({ x:620, w:w, h:h, scored:false });
+      nextSpawn = 50 + Math.random()*40 - Math.min(score, 20);
+      if(nextSpawn < 30) nextSpawn = 30;
+    }
+
+    // 장애물 이동
+    obstacles.forEach(ob => ob.x -= speed);
+    obstacles = obstacles.filter(ob => ob.x > -30);
+
+    // 점수
+    obstacles.forEach(ob=>{
+      if(!ob.scored && ob.x + ob.w < P.x){
+        ob.scored = true;
+        score++;
+        scoreEl.textContent = score;
+      }
+    });
+
+    // 충돌
+    for(const ob of obstacles){
+      if(checkCollision(ob)){
+        gameOver = true;
+        running = false;
+        if(score > best){
+          best = score;
+          bestEl.textContent = best;
+        }
+        break;
+      }
+    }
+
+    // 그리기
+    drawBg();
+    obstacles.forEach(drawObstacle);
+    drawPlayer(P.x, P.y, P.runFrame);
+
+    // 점수 표시 (캔버스 위)
+    ctx.fillStyle = '#4ecca3';
+    ctx.font = '12px "Courier New", monospace';
+    ctx.textAlign = 'right';
+    ctx.fillText('SCORE: ' + score, 590, 20);
+    ctx.textAlign = 'left';
+
+    if(gameOver){
+      // 게임오버
+      ctx.fillStyle = 'rgba(10,10,26,0.7)';
+      ctx.fillRect(0, 0, 600, 200);
+      ctx.fillStyle = '#e74c3c';
+      ctx.font = 'bold 24px "Courier New", monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText('GAME OVER', 300, 85);
+      ctx.fillStyle = '#888';
+      ctx.font = '13px "Courier New", monospace';
+      ctx.fillText('SCORE: ' + score + '  |  BEST: ' + best, 300, 110);
+      ctx.fillStyle = '#4ecca3';
+      ctx.font = '12px "Courier New", monospace';
+      ctx.fillText('탭하거나 스페이스로 재시작', 300, 140);
+      ctx.textAlign = 'left';
+      return;
+    }
+
+    animId = requestAnimationFrame(loop);
+  }
+})();
+</script>
+
 </body>
 </html>
