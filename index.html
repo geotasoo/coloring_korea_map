@@ -459,7 +459,7 @@ Promise.all([
 });
 </script>
 
-  <!-- 
+ <!-- 
   ===== 이스터에그: ⚾ 숫자야구 =====
  
 -->
@@ -487,19 +487,19 @@ Promise.all([
   border-bottom:2px solid #4ecca3; flex-shrink:0;
 }
 #nb-head .nh-title { color:#4ecca3; font-size:15px; font-weight:bold; letter-spacing:1px; }
-#nb-head .nh-meta { color:#888; font-size:12px; display:flex; gap:12px; }
+#nb-head .nh-meta { color:#ccc; font-size:12px; display:flex; gap:12px; }
 #nb-head .nh-meta span b { color:#4ecca3; }
-#nb-close { background:none; border:none; color:#e74c3c; font-size:20px; cursor:pointer; padding:0 2px; }
-#nb-close:hover { color:#ff6b6b; }
+#nb-close { background:none; border:none; color:#ff6b6b; font-size:20px; cursor:pointer; padding:0 2px; }
+#nb-close:hover { color:#ff9090; }
 
 /* 입력 영역 */
-#nb-input-area { padding:16px 18px 12px; flex-shrink:0; border-bottom:1px solid #1e2a40; }
+#nb-input-area { padding:16px 18px 12px; flex-shrink:0; border-bottom:1px solid #2a3a5a; }
 #nb-display {
   display:flex; gap:8px; justify-content:center; margin-bottom:12px;
 }
 .nb-digit {
   width:52px; height:60px; border-radius:10px;
-  border:2px solid #2a3a5a; background:#0d1117;
+  border:2px solid #3a4a6a; background:#161b28;
   display:flex; align-items:center; justify-content:center;
   font-size:28px; font-weight:bold; color:#4ecca3;
   transition:border-color .15s, box-shadow .15s;
@@ -508,28 +508,28 @@ Promise.all([
 .nb-digit.active { border-color:#4ecca3; box-shadow:0 0 10px rgba(78,204,163,0.3); }
 .nb-digit.filled { border-color:#4ecca3; color:#fff; }
 .nb-digit .nd-label {
-  position:absolute; top:3px; left:6px; font-size:9px; color:#444; font-family:sans-serif;
+  position:absolute; top:3px; left:6px; font-size:9px; color:#666; font-family:sans-serif;
 }
 
 /* 숫자 버튼 */
 #nb-numpad { display:grid; grid-template-columns:repeat(5,1fr); gap:6px; margin-bottom:10px; }
 .nb-num {
-  padding:10px 0; border-radius:8px; border:1px solid #2a3a5a;
-  background:#0f1923; color:#ccc; font-size:16px; font-weight:bold;
+  padding:10px 0; border-radius:8px; border:1px solid #3a4a6a;
+  background:#161b28; color:#ddd; font-size:16px; font-weight:bold;
   cursor:pointer; text-align:center; transition:all .15s; font-family:'Courier New',monospace;
 }
-.nb-num:hover { background:#1a2744; border-color:#4ecca3; color:#4ecca3; }
+.nb-num:hover { background:#1f2a44; border-color:#4ecca3; color:#fff; }
 .nb-num:active { transform:scale(0.93); }
 .nb-num.used { opacity:0.25; pointer-events:none; }
 
 /* 액션 버튼 */
 #nb-actions { display:flex; gap:8px; }
 #nb-del {
-  flex:1; padding:10px; border-radius:8px; border:1px solid #3a2a2a;
-  background:#1a0f0f; color:#e74c3c; font-size:13px; cursor:pointer;
-  font-family:'Courier New',monospace; transition:all .15s;
+  flex:1; padding:10px; border-radius:8px; border:1px solid #4a2a2a;
+  background:#2a1515; color:#ff6b6b; font-size:13px; cursor:pointer;
+  font-family:'Courier New',monospace; transition:all .15s; font-weight:bold;
 }
-#nb-del:hover { background:#2a1515; border-color:#e74c3c; }
+#nb-del:hover { background:#3a2020; border-color:#ff6b6b; }
 #nb-submit {
   flex:2; padding:10px; border-radius:8px; border:2px solid #4ecca3;
   background:#0f3460; color:#4ecca3; font-size:13px; font-weight:bold;
@@ -542,32 +542,32 @@ Promise.all([
 /* 기록 */
 #nb-history-wrap {
   flex:1; overflow-y:auto; padding:10px 18px 14px;
-  scrollbar-width:thin; scrollbar-color:#1e2a40 transparent;
+  scrollbar-width:thin; scrollbar-color:#2a3a5a transparent;
 }
 #nb-history-wrap::-webkit-scrollbar { width:4px; }
-#nb-history-wrap::-webkit-scrollbar-thumb { background:#1e2a40; border-radius:2px; }
-.nb-hist-empty { color:#333; font-size:12px; text-align:center; padding:20px 0; }
+#nb-history-wrap::-webkit-scrollbar-thumb { background:#2a3a5a; border-radius:2px; }
+.nb-hist-empty { color:#666; font-size:12px; text-align:center; padding:20px 0; }
 .nb-hist-row {
   display:flex; align-items:center; gap:10px;
   padding:6px 10px; border-radius:6px; margin-bottom:4px;
-  background:#0d1117; border:1px solid #1a2236;
+  background:#161b28; border:1px solid #2a3a5a;
   font-size:13px; animation:histIn .2s ease;
 }
 @keyframes histIn { from{opacity:0;transform:translateX(-8px)} to{opacity:1;transform:none} }
-.nb-hist-row .hr-num { color:#888; font-size:11px; min-width:20px; }
+.nb-hist-row .hr-num { color:#999; font-size:11px; min-width:20px; }
 .nb-hist-row .hr-guess { color:#fff; font-weight:bold; letter-spacing:3px; flex:1; }
 .nb-hist-row .hr-result { display:flex; gap:6px; }
 .hr-s { color:#4ecca3; font-weight:bold; font-size:13px; }
 .hr-b { color:#f39c12; font-weight:bold; font-size:13px; }
-.hr-out { color:#555; font-size:12px; }
+.hr-out { color:#888; font-size:12px; }
 
 /* 기록 패널 (최고기록) */
-#nb-records-wrap { padding:0 18px 14px; flex-shrink:0; border-top:1px solid #1e2a40; }
-#nb-records-title { color:#444; font-size:10px; padding:8px 0 4px; letter-spacing:1px; }
+#nb-records-wrap { padding:0 18px 14px; flex-shrink:0; border-top:1px solid #2a3a5a; }
+#nb-records-title { color:#888; font-size:10px; padding:8px 0 4px; letter-spacing:1px; }
 #nb-records-list { display:flex; gap:6px; flex-wrap:wrap; }
 .nb-rec-chip {
-  background:#0d1117; border:1px solid #1e2a40; border-radius:20px;
-  padding:3px 10px; font-size:11px; color:#666;
+  background:#161b28; border:1px solid #2a3a5a; border-radius:20px;
+  padding:3px 10px; font-size:11px; color:#aaa;
 }
 .nb-rec-chip b { color:#4ecca3; }
 
@@ -581,7 +581,7 @@ Promise.all([
 #nb-win.show { display:flex; }
 #nb-win .nw-emoji { font-size:56px; margin-bottom:10px; animation:nwPop .5s cubic-bezier(.22,.68,0,1.4); }
 #nb-win .nw-title { color:#4ecca3; font-size:22px; font-weight:bold; margin-bottom:6px; }
-#nb-win .nw-detail { color:#888; font-size:13px; margin-bottom:24px; line-height:1.8; }
+#nb-win .nw-detail { color:#bbb; font-size:13px; margin-bottom:24px; line-height:1.8; }
 #nb-win .nw-btns { display:flex; gap:10px; }
 #nb-win button {
   padding:10px 22px; border-radius:8px; font-size:13px; font-weight:bold;
@@ -589,8 +589,8 @@ Promise.all([
 }
 #nw-retry { background:#4ecca3; color:#0d1117; }
 #nw-retry:hover { background:#3ab890; }
-#nw-close-win { background:#1e2a40; color:#888; }
-#nw-close-win:hover { background:#2a3a50; color:#ccc; }
+#nw-close-win { background:#2a3a5a; color:#bbb; }
+#nw-close-win:hover { background:#3a4a70; color:#fff; }
 @keyframes nwPop { from{transform:scale(0.3) rotate(-20deg);opacity:0} to{transform:none;opacity:1} }
 
 /* 폭죽 캔버스 */
@@ -629,7 +629,7 @@ Promise.all([
 
     <div id="nb-records-wrap">
       <div id="nb-records-title">🏆 최고 기록 (시도 횟수 기준)</div>
-      <div id="nb-records-list"><span style="color:#333;font-size:11px;">아직 기록 없음</span></div>
+      <div id="nb-records-list"><span style="color:#666;font-size:11px;">아직 기록 없음</span></div>
     </div>
 
     <div id="nb-win">
@@ -816,7 +816,7 @@ Promise.all([
 
   function renderRecords(){
     var el = document.getElementById('nb-records-list');
-    if(!records.length){ el.innerHTML='<span style="color:#333;font-size:11px;">아직 기록 없음</span>'; return; }
+    if(!records.length){ el.innerHTML='<span style="color:#666;font-size:11px;">아직 기록 없음</span>'; return; }
     el.innerHTML = records.map(function(r,i){
       return '<span class="nb-rec-chip">'+['🥇','🥈','🥉','4위','5위'][i]+' <b>'+r.tries+'번</b> '+r.elapsed+'s</span>';
     }).join('');
