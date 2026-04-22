@@ -85,6 +85,7 @@
 <header style="background:#2E7D5E; color:#fff; padding:10px; font-size:18px; display:flex; justify-content:space-between; align-items:center; flex-shrink:0;">
   <span>우리나라 지도 색칠하기 & 점찍기 🎗️🗺️🖌️🍺🍗🤪 v2.0 20260422</span>
   <div id="iconLinks" style="display:flex; gap:12px; align-items:center;">
+    <span id="egg-trigger" style="cursor:pointer;font-size:18px;" title="">🐣</span>
     <a href="https://buymeacoffee.com/geotasoo" target="_blank" data-tip="커피보내기" style="color:#fff; font-size:18px; text-decoration:none;">☕</a>
     <a href="https://geotasoo.tistory.com/entry/%EC%84%B8%EA%B3%84%EC%A7%80%EB%8F%84-%EC%83%89%EC%B9%A0%ED%95%98%EA%B8%B0-%EC%9B%B9%ED%8E%98%EC%9D%B4%EC%A7%80" target="_blank" data-tip="세계지도 색칠하기" style="color:#fff; font-size:18px; text-decoration:none;">🗺️</a>
     <div id="linkTooltip" style="display:none; position:fixed; background:rgba(0,0,0,0.85); color:#fff; font-size:12px; padding:4px 6px; border-radius:4px; white-space:nowrap; pointer-events:none; z-index:9999;"></div>
@@ -458,10 +459,14 @@ Promise.all([
 });
 </script>
 
-  <!-- 
+<!-- 
   ===== 이스터에그: 🏃 달리기 게임 =====
-  헤더 타이틀을 빠르게 5번 클릭하면 게임이 나타납니다.
-  이 코드 전체를 기존 HTML의 </body> 바로 앞에 붙여넣으세요.
+  🥚 달걀 아이콘을 클릭하면 게임이 나타납니다.
+  
+  [적용 방법]
+  1. 헤더의 iconLinks div 안, 커피(☕) 아이콘 앞에 아래 한 줄 추가:
+     <span id="egg-trigger" style="cursor:pointer;font-size:18px;" title="">🥚</span>
+  2. 이 코드 전체를 기존 HTML의 </body> 바로 앞에 붙여넣기
 -->
 <style>
 #runner-overlay {
@@ -545,46 +550,39 @@ Promise.all([
 
 <script>
 (function(){
-  /* ── 헤더 5연타 감지 ── */
-  let tapCount = 0, tapTimer = null;
-  const headerSpan = document.querySelector('header span');
-  if(headerSpan){
-    headerSpan.addEventListener('click', function(e){
+  /* ── 🥚 달걀 클릭 감지 ── */
+  var eggBtn = document.getElementById('egg-trigger');
+  if(eggBtn){
+    eggBtn.addEventListener('click', function(e){
       e.stopPropagation();
-      tapCount++;
-      clearTimeout(tapTimer);
-      tapTimer = setTimeout(()=>{ tapCount=0; }, 1200);
-      if(tapCount >= 5){
-        tapCount = 0;
-        openRunner();
-      }
+      e.preventDefault();
+      openRunner();
     });
   }
 
   /* ── 게임 상태 ── */
-  const overlay = document.getElementById('runner-overlay');
-  const canvas = document.getElementById('runnerCanvas');
-  const ctx = canvas.getContext('2d');
-  const startScreen = document.getElementById('runner-start-screen');
-  const scoreEl = document.getElementById('runner-score');
-  const bestEl = document.getElementById('runner-best');
+  var overlay = document.getElementById('runner-overlay');
+  var canvas = document.getElementById('runnerCanvas');
+  var ctx = canvas.getContext('2d');
+  var startScreen = document.getElementById('runner-start-screen');
+  var scoreEl = document.getElementById('runner-score');
+  var bestEl = document.getElementById('runner-best');
 
-  let running = false, gameOver = false, started = false;
-  let score = 0, best = 0, speed = 4, frame = 0;
-  let animId = null;
+  var running = false, gameOver = false, started = false;
+  var score = 0, best = 0, speed = 4, frame = 0;
+  var animId = null;
 
-  // 플레이어
-  const P = { x:60, y:0, vy:0, w:20, h:36, jumping:false, runFrame:0 };
-  const GROUND = 160;
-  const GRAVITY = 0.7;
-  const JUMP = -12;
+  var P = { x:60, y:0, vy:0, w:20, h:36, jumping:false, runFrame:0 };
+  var GROUND = 160;
+  var GRAVITY = 0.7;
+  var JUMP = -12;
 
-  // 장애물
-  let obstacles = [];
-  let nextSpawn = 80;
+  var obstacles = [];
+  var nextSpawn = 80;
 
   function openRunner(){
     overlay.classList.add('active');
+    started = false;
     resetGame();
     startScreen.style.display = 'flex';
     drawStatic();
@@ -618,22 +616,10 @@ Promise.all([
     loop();
   }
 
-  /* ── 입력 ── */
   function doJump(){
-    if(!started){
-      startGame();
-      return;
-    }
-    if(gameOver){
-      resetGame();
-      running = true;
-      loop();
-      return;
-    }
-    if(!P.jumping){
-      P.vy = JUMP;
-      P.jumping = true;
-    }
+    if(!started){ startGame(); return; }
+    if(gameOver){ resetGame(); running = true; loop(); return; }
+    if(!P.jumping){ P.vy = JUMP; P.jumping = true; }
   }
 
   document.addEventListener('keydown', function(e){
@@ -644,108 +630,75 @@ Promise.all([
     }
   });
   canvas.addEventListener('click', doJump);
-  canvas.parentElement.querySelector('#runner-start-screen').addEventListener('click', function(e){
+  startScreen.addEventListener('click', function(e){
     e.stopPropagation();
     doJump();
   });
 
-  /* ── 캐릭터 그리기 (픽셀 스틱맨) ── */
-  function drawPlayer(x, y, runFrame){
+  /* ── 캐릭터 (스틱맨) ── */
+  function drawPlayer(x, y, rf){
     ctx.fillStyle = '#4ecca3';
-    // 머리
     ctx.beginPath();
-    ctx.arc(x + 10, y - 30, 6, 0, Math.PI*2);
+    ctx.arc(x+10, y-30, 6, 0, Math.PI*2);
     ctx.fill();
-    // 몸통
     ctx.strokeStyle = '#4ecca3';
     ctx.lineWidth = 2.5;
-    ctx.beginPath();
-    ctx.moveTo(x+10, y-24);
-    ctx.lineTo(x+10, y-10);
-    ctx.stroke();
-    // 팔
-    const armSwing = Math.sin(runFrame * 0.3) * 6;
-    ctx.beginPath();
-    ctx.moveTo(x+10, y-20);
-    ctx.lineTo(x+2+armSwing, y-13);
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.moveTo(x+10, y-20);
-    ctx.lineTo(x+18-armSwing, y-13);
-    ctx.stroke();
-    // 다리
+    ctx.beginPath(); ctx.moveTo(x+10,y-24); ctx.lineTo(x+10,y-10); ctx.stroke();
+    var as = Math.sin(rf*0.3)*6;
+    ctx.beginPath(); ctx.moveTo(x+10,y-20); ctx.lineTo(x+2+as,y-13); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x+10,y-20); ctx.lineTo(x+18-as,y-13); ctx.stroke();
     if(P.jumping){
-      // 점프 중 다리 모아
       ctx.beginPath(); ctx.moveTo(x+10,y-10); ctx.lineTo(x+5,y); ctx.stroke();
       ctx.beginPath(); ctx.moveTo(x+10,y-10); ctx.lineTo(x+15,y); ctx.stroke();
     } else {
-      const legSwing = Math.sin(runFrame * 0.3) * 8;
-      ctx.beginPath(); ctx.moveTo(x+10,y-10); ctx.lineTo(x+4+legSwing,y); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(x+10,y-10); ctx.lineTo(x+16-legSwing,y); ctx.stroke();
+      var ls = Math.sin(rf*0.3)*8;
+      ctx.beginPath(); ctx.moveTo(x+10,y-10); ctx.lineTo(x+4+ls,y); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(x+10,y-10); ctx.lineTo(x+16-ls,y); ctx.stroke();
     }
   }
 
-  /* ── 장애물 그리기 (삼각 바리케이드) ── */
+  /* ── 장애물 ── */
   function drawObstacle(ob){
     ctx.fillStyle = '#e74c3c';
-    // 삼각형 장애물
     ctx.beginPath();
     ctx.moveTo(ob.x, GROUND);
-    ctx.lineTo(ob.x + ob.w/2, GROUND - ob.h);
-    ctx.lineTo(ob.x + ob.w, GROUND);
+    ctx.lineTo(ob.x+ob.w/2, GROUND-ob.h);
+    ctx.lineTo(ob.x+ob.w, GROUND);
     ctx.closePath();
     ctx.fill();
-    // 경고 줄무늬
-    ctx.strokeStyle = '#ff6b6b';
-    ctx.lineWidth = 1;
+    ctx.strokeStyle = '#ff6b6b'; ctx.lineWidth = 1;
     ctx.beginPath();
-    ctx.moveTo(ob.x + ob.w*0.25, GROUND - ob.h*0.3);
-    ctx.lineTo(ob.x + ob.w*0.75, GROUND - ob.h*0.3);
+    ctx.moveTo(ob.x+ob.w*0.25, GROUND-ob.h*0.3);
+    ctx.lineTo(ob.x+ob.w*0.75, GROUND-ob.h*0.3);
     ctx.stroke();
   }
 
   /* ── 배경 ── */
   function drawBg(){
     ctx.fillStyle = '#0a0a1a';
-    ctx.fillRect(0, 0, 600, 200);
-    // 별
+    ctx.fillRect(0,0,600,200);
     ctx.fillStyle = '#333';
-    for(let i=0; i<20; i++){
-      const sx = (i*137 + frame*0.3) % 600;
-      const sy = (i*73) % 120;
-      ctx.fillRect(sx, sy, 1.5, 1.5);
+    for(var i=0;i<20;i++){
+      var sx=(i*137+frame*0.3)%600, sy=(i*73)%120;
+      ctx.fillRect(sx,sy,1.5,1.5);
     }
-    // 지면
-    ctx.strokeStyle = '#4ecca3';
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.moveTo(0, GROUND+1);
-    ctx.lineTo(600, GROUND+1);
-    ctx.stroke();
-    // 지면 점선
-    ctx.strokeStyle = '#1a3a2a';
-    ctx.setLineDash([4,8]);
-    const offset = -(frame * speed) % 12;
-    ctx.beginPath();
-    ctx.moveTo(offset, GROUND+8);
-    ctx.lineTo(600, GROUND+8);
-    ctx.stroke();
+    ctx.strokeStyle = '#4ecca3'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(0,GROUND+1); ctx.lineTo(600,GROUND+1); ctx.stroke();
+    ctx.strokeStyle = '#1a3a2a'; ctx.setLineDash([4,8]);
+    var off = -(frame*speed)%12;
+    ctx.beginPath(); ctx.moveTo(off,GROUND+8); ctx.lineTo(600,GROUND+8); ctx.stroke();
     ctx.setLineDash([]);
   }
 
-  /* ── 충돌 ── */
   function checkCollision(ob){
-    // 삼각형 간이 판정 (사각형 축소)
-    const px = P.x+4, py = P.y-34, pw = 12, ph = 34;
-    const ox = ob.x+4, oy = GROUND-ob.h+4, ow = ob.w-8, oh = ob.h-4;
-    return px < ox+ow && px+pw > ox && py < oy+oh && py+ph > oy;
+    var px=P.x+4, py=P.y-34, pw=12, ph=34;
+    var ox=ob.x+4, oy=GROUND-ob.h+4, ow=ob.w-8, oh=ob.h-4;
+    return px<ox+ow && px+pw>ox && py<oy+oh && py+ph>oy;
   }
 
-  /* ── 정적 화면 ── */
   function drawStatic(){
     drawBg();
-    P.y = GROUND;
-    P.runFrame = 0;
+    P.y = GROUND; P.runFrame = 0;
     drawPlayer(P.x, P.y, 0);
   }
 
@@ -753,87 +706,64 @@ Promise.all([
   function loop(){
     if(!running) return;
     frame++;
+    speed = 4 + Math.floor(score/5)*0.5;
+    if(speed>12) speed=12;
 
-    // 속도 점점 증가
-    speed = 4 + Math.floor(score / 5) * 0.5;
-    if(speed > 12) speed = 12;
-
-    // 물리
     P.vy += GRAVITY;
     P.y += P.vy;
-    if(P.y >= GROUND){
-      P.y = GROUND;
-      P.vy = 0;
-      P.jumping = false;
-    }
+    if(P.y>=GROUND){ P.y=GROUND; P.vy=0; P.jumping=false; }
     if(!P.jumping) P.runFrame++;
 
-    // 장애물 스폰
     nextSpawn--;
-    if(nextSpawn <= 0){
-      const h = 20 + Math.random()*20;
-      const w = 14 + Math.random()*10;
-      obstacles.push({ x:620, w:w, h:h, scored:false });
-      nextSpawn = 50 + Math.random()*40 - Math.min(score, 20);
-      if(nextSpawn < 30) nextSpawn = 30;
+    if(nextSpawn<=0){
+      var h=20+Math.random()*20, w=14+Math.random()*10;
+      obstacles.push({x:620,w:w,h:h,scored:false});
+      nextSpawn = 50+Math.random()*40-Math.min(score,20);
+      if(nextSpawn<30) nextSpawn=30;
     }
 
-    // 장애물 이동
-    obstacles.forEach(ob => ob.x -= speed);
-    obstacles = obstacles.filter(ob => ob.x > -30);
+    obstacles.forEach(function(ob){ob.x-=speed;});
+    obstacles = obstacles.filter(function(ob){return ob.x>-30;});
 
-    // 점수
-    obstacles.forEach(ob=>{
-      if(!ob.scored && ob.x + ob.w < P.x){
-        ob.scored = true;
-        score++;
-        scoreEl.textContent = score;
-      }
+    obstacles.forEach(function(ob){
+      if(!ob.scored && ob.x+ob.w<P.x){ ob.scored=true; score++; scoreEl.textContent=score; }
     });
 
-    // 충돌
-    for(const ob of obstacles){
-      if(checkCollision(ob)){
-        gameOver = true;
-        running = false;
-        if(score > best){
-          best = score;
-          bestEl.textContent = best;
-        }
-        break;
-      }
+    var hit = false;
+    for(var i=0;i<obstacles.length;i++){
+      if(checkCollision(obstacles[i])){ hit=true; break; }
+    }
+    if(hit){
+      gameOver=true; running=false;
+      if(score>best){ best=score; bestEl.textContent=best; }
     }
 
-    // 그리기
     drawBg();
     obstacles.forEach(drawObstacle);
     drawPlayer(P.x, P.y, P.runFrame);
 
-    // 점수 표시 (캔버스 위)
-    ctx.fillStyle = '#4ecca3';
-    ctx.font = '12px "Courier New", monospace';
-    ctx.textAlign = 'right';
-    ctx.fillText('SCORE: ' + score, 590, 20);
-    ctx.textAlign = 'left';
+    ctx.fillStyle='#4ecca3';
+    ctx.font='12px "Courier New",monospace';
+    ctx.textAlign='right';
+    ctx.fillText('SCORE: '+score, 590, 20);
+    ctx.textAlign='left';
 
     if(gameOver){
-      // 게임오버
-      ctx.fillStyle = 'rgba(10,10,26,0.7)';
-      ctx.fillRect(0, 0, 600, 200);
-      ctx.fillStyle = '#e74c3c';
-      ctx.font = 'bold 24px "Courier New", monospace';
-      ctx.textAlign = 'center';
-      ctx.fillText('GAME OVER', 300, 85);
-      ctx.fillStyle = '#888';
-      ctx.font = '13px "Courier New", monospace';
-      ctx.fillText('SCORE: ' + score + '  |  BEST: ' + best, 300, 110);
-      ctx.fillStyle = '#4ecca3';
-      ctx.font = '12px "Courier New", monospace';
-      ctx.fillText('탭하거나 스페이스로 재시작', 300, 140);
-      ctx.textAlign = 'left';
+      ctx.fillStyle='rgba(10,10,26,0.7)';
+      ctx.fillRect(0,0,600,200);
+      ctx.fillStyle='#e74c3c';
+      ctx.font='bold 24px "Courier New",monospace';
+      ctx.textAlign='center';
+      ctx.fillText('GAME OVER',300,85);
+      ctx.fillStyle='#888';
+      ctx.font='13px "Courier New",monospace';
+      ctx.fillText('SCORE: '+score+'  |  BEST: '+best,300,110);
+      ctx.fillStyle='#4ecca3';
+      ctx.font='12px "Courier New",monospace';
+      ctx.fillText('탭하거나 스페이스로 재시작',300,140);
+      ctx.textAlign='left';
       return;
     }
-
     animId = requestAnimationFrame(loop);
   }
 })();
