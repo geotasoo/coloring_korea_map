@@ -604,8 +604,11 @@ Promise.all([
 (function() {
   var FOOD_EMOJIS = ['🍕','🍔','🍜','🍣','🌮','🍩','🍦','🍗','🥗','🍱','🥐','🍛','🧆','🥩','🍤','🍙','🥘','🍝','🥪','🫕','🍢','🍖','🥟','🫔'];
 
-  var REGIONS = {}; // Will be populated from GeoJSON
-  var DIFF = {};
+  // Make these globally accessible for the main script
+  window.REGIONS = {}; // Will be populated from GeoJSON
+  window.DIFF = {};
+  var REGIONS = window.REGIONS;
+  var DIFF = window.DIFF;
   var LB = [];
 
   var G = {
@@ -617,7 +620,7 @@ Promise.all([
   };
 
   // Build REGIONS from GeoJSON after map loads
-  function initializeRegions(sgJson) {
+  window.initializeRegions = function(sgJson) {
     sgJson.features.forEach(function(feature) {
       var name = feature.properties.NL_NAME_2;
       if (name && !REGIONS[name]) {
@@ -626,7 +629,8 @@ Promise.all([
         DIFF[name] = name.length <= 3 ? 1 : name.length <= 4 ? 2 : 3;
       }
     });
-  }
+    console.log('REGIONS initialized:', Object.keys(REGIONS).length, 'regions');
+  };
 
   function getDiff(score) {
     return score < 8 ? 1 : score < 15 ? 2 : 3;
@@ -634,8 +638,12 @@ Promise.all([
 
   function buildQueue(maxDiff) {
     var keys = Object.keys(REGIONS);
+    console.log('buildQueue called, REGIONS has', keys.length, 'keys, maxDiff:', maxDiff);
     var validKeys = keys.filter(function(r){ return DIFF[r] <= maxDiff; });
-    return validKeys.sort(function(){ return Math.random() - 0.5; });
+    console.log('validKeys:', validKeys.length, 'regions match difficulty');
+    var queue = validKeys.sort(function(){ return Math.random() - 0.5; });
+    console.log('Queue built:', queue.slice(0, 5));
+    return queue;
   }
 
   (function initGame() {
@@ -687,7 +695,18 @@ Promise.all([
     document.getElementById('toolbar').style.display = 'none';
     document.getElementById('ghud').classList.add('on');
 
-    // Clear all existing colors to show blank map
+    // Clear ALL colors - both Leaflet layers and game classes
+    // 1. Clear Leaflet layer color map
+    if (typeof coloredSg !== 'undefined') {
+      coloredSg.clear();
+    }
+    // 2. Reset all layer styles
+    if (typeof sgLayer !== 'undefined' && sgLayer) {
+      sgLayer.eachLayer(function(layer) {
+        layer.setStyle(getSgStyle(layer));
+      });
+    }
+    // 3. Clear game-specific classes
     var paths = document.querySelectorAll('path[data-sigungu]');
     paths.forEach(function(p){ 
       p.style.fill = ''; 
@@ -719,7 +738,9 @@ Promise.all([
     G.wrongCnt = 0; G.hintUsed = false;
     updateWrong();
     document.getElementById('ghint-btn').disabled = false;
-    document.getElementById('gq').textContent = G.queue[G.idx];
+    var currentQuestion = G.queue[G.idx];
+    console.log('nextQ: showing question', G.idx, ':', currentQuestion);
+    document.getElementById('gq').textContent = currentQuestion || '???';
     document.getElementById('gscore').textContent = G.score;
     hideHintPop();
   }
