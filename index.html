@@ -83,7 +83,7 @@
 </head>
 <body>
 <header style="background:#2E7D5E; color:#fff; padding:10px; font-size:18px; display:flex; justify-content:space-between; align-items:center; flex-shrink:0;">
-  <span>우리나라 지도 색칠하기 & 점찍기 🎗️🗺️🖌️🍺ㅇㅇㅇㅇㅇㅇ🍗🤪 v2.0 20260422</span>
+  <span>우리나라 지도 색칠하기 & 점찍기 🎗️🗺️🖌️🍺🍗🤪 v2.0 20260422</span>
   <div id="iconLinks" style="display:flex; gap:12px; align-items:center;">
     <span id="egg-trigger" style="cursor:pointer;font-size:18px;" title="">🐤</span>
     <a href="https://buymeacoffee.com/geotasoo" target="_blank" data-tip="커피보내기" style="color:#fff; font-size:18px; text-decoration:none;">☕</a>
@@ -136,6 +136,7 @@
   <div id="map-wrap">
     <div id="helpLink">
       PC에서 사용을 권장합니다. 모바일에서는 점찍기가 힘들어요.<br>
+      이 웹페이지는 모두 황병삼쌤 덕분입니다. 고맙습니다.<br>
       <a href="https://geotasoo.tistory.com/entry/%EC%9A%B0%EB%A6%AC%EB%82%98%EB%9D%BC-%EC%A7%80%EB%8F%84-%EC%83%89%EC%B9%A0%ED%95%98%EA%B8%B0-%EC%9B%B9%ED%8E%98%EC%9D%B4%EC%A7%80" target="_blank">사용법보기/생각나누기</a>
     </div>
     <div id="map"></div>
@@ -197,7 +198,8 @@ const KOREA_CITIES=[
 const SIDO_ORDER=["특별·광역·특별자치시","도·특별자치도청","섬·산·고개","경기도","강원특별자치도","충청북도","충청남도","전북특별자치도","전라남도","경상북도","경상남도","제주특별자치도","북측"];
 
 let selectedCities=new Set(), dotMarkers=[], dotMode=false, sidoCollapsed=new Set(SIDO_ORDER), manualPins=[];
-let nkVisible=false;
+let nkVisible=false; // 기본값: 북한 꺼짐
+// 경계 모드: 0=없애기, 1=나라, 2=시도, 3=시군 (기본: 3=시군)
 const BORDER_MODES=['경계없음','남측','시도','시군'];
 let borderMode=3;
 const $=id=>document.getElementById(id);
@@ -225,10 +227,12 @@ $('dotStroke').addEventListener('change',renderDots);
 map.on('zoomend',()=>{ if(dotMarkers.length>0) renderDots(); });
 $('btn-base').addEventListener('click',()=>{baseOn=!baseOn;if(baseOn){map.addLayer(baseLayer);$('btn-base').textContent='🌝 배경지도';}else{map.removeLayer(baseLayer);$('btn-base').textContent='🌚 배경지도';}});
 
+// 패널
 function openPanels(){dotMode=true;$('city-panel').classList.add('open');$('pin-panel').classList.add('open');$('btn-dot-panel').textContent='✅ 점찍기 완료';$('btn-dot-panel').classList.add('active');map.getContainer().style.cursor='crosshair';buildDotList('');buildPinList();}
 function closePanels(){dotMode=false;$('city-panel').classList.remove('open');$('pin-panel').classList.remove('open');$('btn-dot-panel').textContent='📍 점찍기';$('btn-dot-panel').classList.remove('active');map.getContainer().style.cursor='';}
 $('btn-dot-panel').addEventListener('click',()=>{if(dotMode)closePanels();else openPanels();});
 
+// 북측 토글: ON/OFF + 화면 맞춤
 $('btn-nk').addEventListener('click',()=>{
   nkVisible=!nkVisible;
   const btn=$('btn-nk');
@@ -244,6 +248,7 @@ $('btn-nk').addEventListener('click',()=>{
   fitMapBounds();
 });
 
+// 화면 맞춤 함수
 function fitMapBounds(){
   const layers=[];
   if(borderMode===1 && skLayer) layers.push(skLayer);
@@ -311,7 +316,9 @@ function buildPinList(){
 function renderDots(){
   dotMarkers.forEach(m=>map.removeLayer(m));dotMarkers=[];
   const r=parseFloat($('dotSize').value),color=$('dotColor').value,stroke=$('dotStroke').checked;
+  // circle은 미터 단위 - 슬라이더 값을 미터로 변환 (1→3000m, 12→36000m)
   const radiusM = r * 3000;
+  // 현재 줌에서 반지름이 몇 픽셀인지 계산해서 테두리 비율 맞춤
   const c = map.getCenter();
   const p1 = map.latLngToContainerPoint(c);
   const p2 = map.latLngToContainerPoint(L.latLng(c.lat, c.lng + radiusM / (111320 * Math.cos(c.lat * Math.PI / 180))));
@@ -338,6 +345,7 @@ Promise.all([
   fetch('202604_sk.geojson').then(r=>r.json())
 ]).then(([sdJson,sgJson,nkJson,skJson])=>{
 
+  // 북한 레이어 (토글 가능, 색칠 가능) - 기본 숨김
   nkLayer = L.geoJSON(nkJson,{
     style: ()=>({color:'#333', weight:parseFloat($('slider-nk').value), fillColor:'#ffffff', fillOpacity:defaultLandOpacity, opacity:1}),
     onEachFeature:(ft,ly)=>{
@@ -349,8 +357,9 @@ Promise.all([
       });
       ly.on('mouseout',hideTT);
     }
-  });
+  }); // 기본 숨김 - addTo(map) 안 함
 
+  // 속성명: NL_NAME_1 (시도), NL_NAME_2 (시군)
   provinceNames=[...new Set(sdJson.features.map(f=>f.properties.NL_NAME_1))].sort();
   const pc=$('provinceCheckboxes');pc.innerHTML='';
   provinceNames.forEach(n=>{const l=document.createElement('label');l.innerHTML=`<input type="checkbox" value="${n}" checked> ${n}`;pc.appendChild(l);});
@@ -366,7 +375,6 @@ Promise.all([
   }});}
 
   function createSgLayer(f){return L.geoJSON(sgJson,{filter:f,style:getSgStyle,onEachFeature:(ft,ly)=>{
-    if(ft.properties?.NL_NAME_2) ly.getElement().setAttribute('data-sigungu', ft.properties.NL_NAME_2);
     ly.on('click',()=>{if(dotMode)return;if(sgVisible){toggleSgLayerColor(ly);sdBorderLayer.bringToFront();}});
     if(ft.properties?.NL_NAME_2){const n=ft.properties.NL_NAME_2;ly.on('mouseover',e=>showTT(n,e));ly.on('mousemove',e=>showTT(n,e));ly.on('mouseout',hideTT);}
   }});}
@@ -380,11 +388,14 @@ Promise.all([
     const sel=Array.from(selectedProvinces);
     const ff=sel.length===0?(f=>false):(f=>sel.includes(f.properties.NL_NAME_1));
 
+    // borderMode: 0=없애기, 1=나라(sd fill만), 2=시도(sd fill+border), 3=시군(sg)
     if(borderMode===0){
+      // 없애기: 아무것도 안 그림
       sdLayer=L.geoJSON({type:'FeatureCollection',features:[]}).addTo(map);
       sgLayer=L.geoJSON({type:'FeatureCollection',features:[]});
       sdBorderLayer=L.geoJSON({type:'FeatureCollection',features:[]}).addTo(map);
     } else if(borderMode===1){
+      // 나라: 남한 전체 윤곽(sk) + 나라 경계
       if(skLayer)map.removeLayer(skLayer);
       skLayer=L.geoJSON(skJson,{
         style:()=>({color:'#333',weight:parseFloat($('slider-nk').value),fillColor:'#ffffff',fillOpacity:defaultLandOpacity,opacity:1}),
@@ -394,12 +405,14 @@ Promise.all([
       sgLayer=L.geoJSON({type:'FeatureCollection',features:[]});
       sdBorderLayer=L.geoJSON({type:'FeatureCollection',features:[]}).addTo(map);
     } else if(borderMode===2){
+      // 시도: sd fill + 시도 경계
       sdLayer=createSdLayer(ff).addTo(map);
       sgLayer=L.geoJSON({type:'FeatureCollection',features:[]});
       sdBorderLayer=L.geoJSON(sdJson,{filter:ff,style:()=>({color:'#222',weight:parseFloat($('slider-sd').value),fillOpacity:0,opacity:1}),interactive:false}).addTo(map);
       sdLayer.setStyle({fillOpacity:defaultLandOpacity,opacity:1});
       sdBorderLayer.bringToFront();
     } else {
+      // 시군(3): sg + sd border
       sdLayer=createSdLayer(ff).addTo(map);
       sgLayer=createSgLayer(ff);
       sdBorderLayer=L.geoJSON(sdJson,{filter:ff,style:()=>({color:'#222',weight:parseFloat($('slider-sd').value),fillOpacity:0,opacity:1}),interactive:false}).addTo(map);
@@ -413,6 +426,7 @@ Promise.all([
   }
   updateLayers();
 
+  // 경계 버튼: 없애기 → 나라 → 시도 → 시군 순환
   function updateBorderBtn(){
     const btn=$('btn-sg');
     const labels=['경계없음 →','남측 →','시도 →','시군 →'];
@@ -445,595 +459,5 @@ Promise.all([
 });
 </script>
 
- <!-- 
-  ===== 이스터에그: 🗺️ 지역 찾기 게임 =====
--->
-
-<style>
-#game-overlay{display:none;position:fixed;inset:0;z-index:5000;background:rgba(0,0,0,.72);align-items:center;justify-content:center;}
-#game-overlay.active{display:flex;}
-.gbox{background:#fff;border-radius:16px;padding:32px 38px;width:460px;max-width:94vw;max-height:90vh;overflow-y:auto;box-shadow:0 8px 40px rgba(0,0,0,.3);text-align:center;}
-.gbox h2{margin:0 0 10px;font-size:24px;}
-.grules{background:#f8f8f8;border-radius:8px;padding:12px 16px;font-size:13px;color:#555;line-height:1.9;text-align:left;margin-bottom:16px;}
-.grules b{color:#2E7D5E;}
-.epick-title{font-size:13px;color:#666;margin-bottom:8px;}
-.egrid{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin-bottom:12px;}
-.eopt{font-size:24px;background:#f5f5f5;border:2px solid transparent;border-radius:8px;padding:4px 7px;cursor:pointer;transition:all .15s;line-height:1.3;}
-.eopt:hover{background:#e8f5e9;transform:scale(1.1);}
-.eopt.sel{border-color:#2E7D5E;background:#e8f5e9;}
-#gbtn{background:#2E7D5E;color:#fff;border:none;border-radius:8px;padding:12px 36px;font-size:16px;cursor:pointer;font-weight:bold;opacity:.4;transition:opacity .2s;}
-#gbtn.rdy{opacity:1;}
-#gbtn.rdy:hover{background:#256b4e;}
-#ghud{display:none;position:fixed;top:0;left:0;right:0;z-index:5500;background:rgba(46,125,94,.96);color:#fff;height:76px;padding:0 20px;box-shadow:0 2px 10px rgba(0,0,0,.3);}
-#ghud.on{display:grid;grid-template-columns:180px 1fr 240px;align-items:center;}
-.hl{display:flex;gap:18px;}
-.hc{display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;}
-.hr{display:flex;align-items:center;gap:8px;justify-content:flex-end;}
-.hbtns{display:flex;gap:8px;}
-.hc-row{display:flex;align-items:center;justify-content:center;gap:12px;margin-top:4px;}
-.hblk{display:flex;flex-direction:column;align-items:center;}
-.hlbl{font-size:10px;opacity:.7;margin-bottom:1px;}
-#gtimer{font-size:28px;font-weight:bold;line-height:1;transition:color .3s;}
-#gtimer.red{color:#ff5252;}
-#gscore{font-size:24px;font-weight:bold;line-height:1;}
-#gq{font-size:26px;font-weight:bold;letter-spacing:.3px;}
-#gwrong{font-size:16px;margin-top:4px;letter-spacing:4px;}
-#ghint-btn{background:rgba(255,255,255,.22);border:1px solid rgba(255,255,255,.5);color:#fff;border-radius:6px;padding:4px 10px;font-size:12px;cursor:pointer;white-space:nowrap;}
-#ghint-btn:hover{background:rgba(255,213,0,.3);}
-#ghint-btn:disabled{opacity:.4;cursor:not-allowed;}
-#gpass-btn{background:rgba(255,255,255,.22);border:1px solid rgba(255,255,255,.5);color:#fff;border-radius:6px;padding:4px 10px;font-size:12px;cursor:pointer;}
-#gpass-btn:hover{background:rgba(255,255,255,.26);}
-#gpass-btn:disabled{opacity:.4;cursor:not-allowed;}
-#gexit-btn{background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.32);color:#fff;border-radius:6px;padding:5px 9px;font-size:12px;cursor:pointer;}
-#gexit-btn:hover{background:rgba(255,255,255,.2);}
-#ghint-pop{display:none;position:fixed;top:70px;left:50%;transform:translateX(-50%);z-index:5600;background:rgba(20,20,20,.9);color:#ffe066;padding:8px 18px;border-radius:8px;font-size:14px;font-weight:bold;pointer-events:none;white-space:nowrap;}
-#gfb{display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:6000;font-size:54px;pointer-events:none;animation:gbounce .6s ease forwards;}
-@keyframes gbounce{0%{opacity:0;transform:translate(-50%,-64%) scale(.5)}30%{opacity:1;transform:translate(-50%,-50%) scale(1.2)}70%{opacity:1;transform:translate(-50%,-50%) scale(1)}100%{opacity:0;transform:translate(-50%,-44%) scale(.9)}}
-#gresult{display:none;position:fixed;inset:0;z-index:6000;background:rgba(0,0,0,.62);justify-content:flex-start;align-items:center;flex-direction:column;padding-top:20px;overflow-y:auto;}
-#gresult.on{display:flex;}
-.grbox{background:#fff;border-radius:16px;padding:24px 28px;width:520px;max-width:96vw;box-shadow:0 8px 40px rgba(0,0,0,.3);margin-bottom:12px;}
-.grbox h2{margin:0 0 3px;font-size:20px;text-align:center;}
-.grsub{text-align:center;color:#888;font-size:12px;margin-bottom:12px;}
-.grbadges{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-bottom:12px;}
-.grbadge{border-radius:10px;padding:7px 14px;text-align:center;min-width:70px;}
-.grbadge .n{font-size:26px;font-weight:bold;}
-.grbadge .l{font-size:11px;}
-.bc{background:#e8f5e9;color:#2e7d32;}
-.bw{background:#ffebee;color:#c62828;}
-.bp{background:#fff8e1;color:#e65100;}
-.grsec{font-size:11px;font-weight:bold;color:#aaa;margin:10px 0 5px;border-top:1px solid #eee;padding-top:8px;}
-.grtags{display:flex;flex-wrap:wrap;gap:4px;}
-.gtag{padding:3px 9px;border-radius:20px;font-size:12px;}
-.tc{background:#e8f5e9;color:#2e7d32;}
-.tw{background:#ffebee;color:#c62828;}
-.tp{background:#fff8e1;color:#e65100;}
-.grbtns{display:flex;gap:10px;margin-top:14px;justify-content:center;}
-.grbtn{border:none;border-radius:8px;padding:10px 22px;font-size:14px;cursor:pointer;font-weight:bold;}
-.grbtn-go{background:#2E7D5E;color:#fff;}
-.grbtn-go:hover{background:#256b4e;}
-.grbtn-cl{background:#eee;color:#333;}
-.grbtn-cl:hover{background:#ddd;}
-.lbbox{background:#fff;border-radius:16px;padding:18px 26px;width:520px;max-width:96vw;box-shadow:0 4px 20px rgba(0,0,0,.15);margin-bottom:24px;}
-.lbbox h3{margin:0 0 10px;font-size:15px;}
-.lbrow{display:flex;align-items:center;gap:10px;padding:5px 0;border-bottom:1px solid #f5f5f5;font-size:14px;}
-.lbrow:last-child{border-bottom:none;}
-.lbrnk{min-width:22px;font-weight:bold;color:#bbb;font-size:13px;}
-.lbrnk.r1{color:#f6a000;}.lbrnk.r2{color:#888;}.lbrnk.r3{color:#cd7f32;}
-.lbem{font-size:20px;}
-.lbsc{margin-left:auto;font-weight:bold;color:#2E7D5E;}
-.lbnew{font-size:10px;background:#e8f5e9;color:#2e7d32;border-radius:10px;padding:1px 6px;margin-left:4px;}
-.lbmt{color:#bbb;font-size:13px;text-align:center;padding:10px 0;}
-</style>
-
-<div id="game-overlay">
-  <div class="gbox">
-    <h2>🗺️ 지역 찾기</h2>
-    <div class="grules">
-      <b>📌 게임 방법</b><br>
-      • 1분 안에 시군구 이름을 보고 지도에서 찾아 클릭!<br>
-      • 3번 틀리면 자동으로 다음 지역으로 넘어가요<br>
-      • 패스 3회 사용 가능<br>
-      • <b>💡 힌트</b>: 주변 지역 표시 (단, <b>-1초</b> 패널티!)
-    </div>
-    <div class="epick-title">🍽️ 나의 음식 아이콘을 골라주세요</div>
-    <div class="egrid" id="egrid"></div>
-    <button id="gbtn" disabled>이모지를 선택하세요</button>
-  </div>
-</div>
-
-<div id="ghud">
-  <div class="hl">
-    <div class="hblk"><div class="hlbl">남은 시간</div><div id="gtimer">60</div></div>
-    <div class="hblk"><div class="hlbl">점수</div><div id="gscore">0</div></div>
-  </div>
-  <div class="hc">
-    <div id="gq">—</div>
-    <div class="hc-row">
-      <div id="gwrong">○○○</div>
-      <div class="hbtns">
-        <button id="ghint-btn">💡 힌트 (-1초)</button>
-        <button id="gpass-btn">⏭️ 패스 (3)</button>
-      </div>
-    </div>
-  </div>
-  <div class="hr">
-    <button id="gexit-btn">나가기</button>
-  </div>
-</div>
-<div id="ghint-pop"></div>
-<div id="gfb"></div>
-<div id="gresult"></div>
-
-<script>
-(function() {
-  var FOOD_EMOJIS = ['🍕','🍔','🍜','🍣','🌮','🍩','🍦','🍗','🥗','🍱','🥐','🍛','🧆','🥩','🍤','🍙','🥘','🍝','🥪','🫕','🍢','🍖','🥟','🫔'];
-
-  var REGIONS = {
-    "서울특별시":{adjacent:["인천광역시","경기도"]},
-    "부산광역시":{adjacent:["울산광역시","경상남도","김해시","양산시"]},
-    "대구광역시":{adjacent:["경상북도","경산시","청도군","고령군"]},
-    "인천광역시":{adjacent:["서울특별시","경기도","김포시","부천시"]},
-    "광주광역시":{adjacent:["전라남도","화순군","담양군","장성군"]},
-    "대전광역시":{adjacent:["세종특별자치시","충청남도","충청북도","금산군","청주시","공주시"]},
-    "울산광역시":{adjacent:["부산광역시","경상남도","경상북도","양산시","경주시"]},
-    "세종특별자치시":{adjacent:["대전광역시","충청남도","충청북도","공주시","청주시"]},
-    "수원시":{adjacent:["용인시","화성시","의왕시","군포시","안산시"]},
-    "성남시":{adjacent:["서울특별시","광주시","하남시","용인시"]},
-    "고양시":{adjacent:["서울특별시","파주시","양주시","의정부시"]},
-    "용인시":{adjacent:["수원시","성남시","안성시","평택시","화성시"]},
-    "부천시":{adjacent:["서울특별시","인천광역시","김포시","시흥시"]},
-    "안산시":{adjacent:["수원시","시흥시","화성시","군포시"]},
-    "안양시":{adjacent:["서울특별시","과천시","군포시","의왕시"]},
-    "남양주시":{adjacent:["서울특별시","구리시","하남시","양평군","가평군"]},
-    "화성시":{adjacent:["수원시","안산시","평택시","오산시","용인시"]},
-    "평택시":{adjacent:["화성시","안성시","아산시","당진시"]},
-    "의정부시":{adjacent:["서울특별시","양주시","동두천시","포천시"]},
-    "시흥시":{adjacent:["안산시","부천시","광명시","안양시"]},
-    "파주시":{adjacent:["고양시","연천군","김포시"]},
-    "김포시":{adjacent:["서울특별시","인천광역시","부천시","고양시","파주시"]},
-    "광명시":{adjacent:["서울특별시","부천시","시흥시"]},
-    "광주시":{adjacent:["성남시","하남시","양평군","여주시"]},
-    "군포시":{adjacent:["수원시","안양시","안산시","의왕시"]},
-    "이천시":{adjacent:["광주시","여주시","안성시","충청북도"]},
-    "양주시":{adjacent:["의정부시","동두천시","포천시","연천군"]},
-    "오산시":{adjacent:["수원시","화성시","평택시"]},
-    "구리시":{adjacent:["서울특별시","남양주시"]},
-    "안성시":{adjacent:["용인시","이천시","평택시","충청북도"]},
-    "포천시":{adjacent:["의정부시","양주시","가평군","강원특별자치도"]},
-    "의왕시":{adjacent:["수원시","안양시","군포시","과천시"]},
-    "하남시":{adjacent:["서울특별시","성남시","광주시","남양주시"]},
-    "여주시":{adjacent:["광주시","이천시","양평군","충청북도"]},
-    "동두천시":{adjacent:["의정부시","양주시","연천군"]},
-    "과천시":{adjacent:["서울특별시","안양시","의왕시"]},
-    "가평군":{adjacent:["남양주시","포천시","양평군","강원특별자치도"]},
-    "양평군":{adjacent:["남양주시","광주시","여주시","가평군","강원특별자치도"]},
-    "연천군":{adjacent:["파주시","동두천시","양주시","포천시"]},
-    
-    "춘천시":{adjacent:["홍천군","화천군","양구군","인제군"]},
-    "원주시":{adjacent:["횡성군","영월군","평창군","충청북도"]},
-    "강릉시":{adjacent:["평창군","정선군","동해시","양양군"]},
-    "동해시":{adjacent:["강릉시","삼척시"]},
-    "태백시":{adjacent:["삼척시","정선군","경상북도"]},
-    "속초시":{adjacent:["양양군","고성군","인제군"]},
-    "삼척시":{adjacent:["동해시","태백시","경상북도"]},
-    "홍천군":{adjacent:["춘천시","횡성군","인제군","평창군"]},
-    "횡성군":{adjacent:["원주시","홍천군","평창군"]},
-    "영월군":{adjacent:["원주시","평창군","정선군","경상북도","충청북도"]},
-    "평창군":{adjacent:["원주시","강릉시","홍천군","영월군","정선군"]},
-    "정선군":{adjacent:["강릉시","태백시","영월군","평창군"]},
-    "철원군":{adjacent:["화천군","김화군"]},
-    "화천군":{adjacent:["춘천시","철원군","양구군","인제군"]},
-    "양구군":{adjacent:["춘천시","화천군","인제군"]},
-    "인제군":{adjacent:["춘천시","속초시","홍천군","화천군","양구군","고성군","양양군"]},
-    "고성군":{adjacent:["속초시","인제군","양양군"]},
-    "양양군":{adjacent:["강릉시","속초시","인제군","고성군"]},
-
-    "청주시":{adjacent:["대전광역시","세종특별자치시","보은군","옥천군","진천군","증평군"]},
-    "충주시":{adjacent:["제천시","음성군","괴산군","경상북도"]},
-    "제천시":{adjacent:["충주시","단양군","경상북도","강원특별자치도"]},
-    "보은군":{adjacent:["청주시","옥천군","괴산군","경상북도"]},
-    "옥천군":{adjacent:["청주시","보은군","영동군","전라북도"]},
-    "영동군":{adjacent:["옥천군","전라북도","경상북도"]},
-    "증평군":{adjacent:["청주시","괴산군","진천군"]},
-    "진천군":{adjacent:["청주시","증평군","음성군","경기도"]},
-    "괴산군":{adjacent:["청주시","충주시","보은군","증평군"]},
-    "음성군":{adjacent:["충주시","진천군","경기도"]},
-    "단양군":{adjacent:["제천시","경상북도","강원특별자치도"]},
-
-    "천안시":{adjacent:["아산시","세종특별자치시","공주시","청주시"]},
-    "공주시":{adjacent:["대전광역시","세종특별자치시","천안시","논산시","부여군"]},
-    "보령시":{adjacent:["서천군","청양군","홍성군"]},
-    "아산시":{adjacent:["천안시","평택시","당진시","예산군"]},
-    "서산시":{adjacent:["당진시","태안군","홍성군"]},
-    "논산시":{adjacent:["대전광역시","공주시","부여군","전라북도"]},
-    "계룡시":{adjacent:["대전광역시","공주시","논산시"]},
-    "당진시":{adjacent:["아산시","서산시","평택시"]},
-    "금산군":{adjacent:["대전광역시","전라북도","충청북도"]},
-    "부여군":{adjacent:["공주시","논산시","서천군","청양군"]},
-    "서천군":{adjacent:["보령시","부여군","전라북도"]},
-    "청양군":{adjacent:["보령시","부여군","공주시","홍성군"]},
-    "홍성군":{adjacent:["보령시","청양군","서산시","예산군"]},
-    "예산군":{adjacent:["아산시","홍성군","당진시"]},
-    "태안군":{adjacent:["서산시"]},
-
-    "전주시":{adjacent:["익산시","완주군","진안군","김제시"]},
-    "군산시":{adjacent:["익산시","김제시","부안군"]},
-    "익산시":{adjacent:["전주시","군산시","김제시","완주군"]},
-    "정읍시":{adjacent:["김제시","부안군","고창군","순창군","전라남도"]},
-    "남원시":{adjacent:["완주군","임실군","순창군","경상남도"]},
-    "김제시":{adjacent:["전주시","군산시","익산시","정읍시","부안군"]},
-    "완주군":{adjacent:["전주시","익산시","남원시","진안군","임실군"]},
-    "진안군":{adjacent:["전주시","완주군","무주군","장수군","충청남도"]},
-    "무주군":{adjacent:["진안군","장수군","경상북도","충청북도"]},
-    "장수군":{adjacent:["진안군","무주군","임실군","경상남도","경상북도"]},
-    "임실군":{adjacent:["완주군","남원시","장수군","순창군"]},
-    "순창군":{adjacent:["정읍시","남원시","임실군","전라남도"]},
-    "고창군":{adjacent:["정읍시","부안군","전라남도"]},
-    "부안군":{adjacent:["군산시","김제시","정읍시","고창군"]},
-
-    "목포시":{adjacent:["무안군","신안군","영암군"]},
-    "여수시":{adjacent:["순천시","광양시","고흥군"]},
-    "순천시":{adjacent:["여수시","광양시","구례군","고흥군","보성군"]},
-    "나주시":{adjacent:["광주광역시","화순군","영암군","무안군","함평군"]},
-    "광양시":{adjacent:["여수시","순천시","구례군","경상남도"]},
-    "담양군":{adjacent:["광주광역시","곡성군","전라북도"]},
-    "곡성군":{adjacent:["담양군","순천군","구례군","전라북도"]},
-    "구례군":{adjacent:["순천시","광양시","곡성군","경상남도"]},
-    "고흥군":{adjacent:["여수시","순천시","보성군"]},
-    "보성군":{adjacent:["순천시","고흥군","화순군","장흥군"]},
-    "화순군":{adjacent:["광주광역시","나주시","보성군","순천군","담양군"]},
-    "장흥군":{adjacent:["보성군","강진군","영암군"]},
-    "강진군":{adjacent:["장흥군","영암군","해남군"]},
-    "해남군":{adjacent:["강진군","영암군","완도군","진도군"]},
-    "영암군":{adjacent:["목포시","나주시","장흥군","강진군","해남군","무안군"]},
-    "무안군":{adjacent:["목포시","나주시","영암군","함평군","신안군"]},
-    "함평군":{adjacent:["나주시","무안군","영광군","장성군"]},
-    "영광군":{adjacent:["함평군","장성군","전라북도"]},
-    "장성군":{adjacent:["광주광역시","함평군","영광군","담양군","전라북도"]},
-    "완도군":{adjacent:["해남군","진도군"]},
-    "진도군":{adjacent:["해남군","완도군"]},
-    "신안군":{adjacent:["목포시","무안군"]},
-
-    "포항시":{adjacent:["경주시","영덕군","청송군","영천시"]},
-    "경주시":{adjacent:["울산광역시","포항시","영천시","청도군"]},
-    "김천시":{adjacent:["구미시","성주군","전라북도","충청북도"]},
-    "안동시":{adjacent:["영주시","봉화군","의성군","청송군"]},
-    "구미시":{adjacent:["김천시","칠곡군","군위군","성주군"]},
-    "영주시":{adjacent:["안동시","봉화군","예천군","충청북도","강원특별자치도"]},
-    "영천시":{adjacent:["포항시","경주시","청도군","경산시"]},
-    "상주시":{adjacent:["문경시","예천군","의성군","충청북도"]},
-    "문경시":{adjacent:["상주시","예천군","충청북도"]},
-    "경산시":{adjacent:["대구광역시","영천시","청도군","자인군"]},
-    "의성군":{adjacent:["안동시","상주시","군위군","청송군"]},
-    "청송군":{adjacent:["포항시","안동시","의성군","영덕군"]},
-    "영양군":{adjacent:["안동시","봉화군","영덕군"]},
-    "영덕군":{adjacent:["포항시","청송군","영양군"]},
-    "청도군":{adjacent:["경주시","영천시","경산시","밀양시"]},
-    "고령군":{adjacent:["대구광역시","구미시","성주군","합천군"]},
-    "성주군":{adjacent:["김천시","구미시","고령군","칠곡군"]},
-    "칠곡군":{adjacent:["대구광역시","구미시","성주군","군위군"]},
-    "예천군":{adjacent:["영주시","상주시","문경시","의성군"]},
-    "봉화군":{adjacent:["안동시","영주시","영양군","강원특별자치도"]},
-    "울진군":{adjacent:["봉화군","강원특별자치도"]},
-    "울릉군":{adjacent:[]},
-    "군위군":{adjacent:["구미시","칠곡군","의성군"]},
-
-    "창원시":{adjacent:["진주시","김해시","함안군","의령군"]},
-    "진주시":{adjacent:["창원시","사천시","산청군","의령군","함안군"]},
-    "통영시":{adjacent:["거제시","고성군","사천시"]},
-    "사천시":{adjacent:["진주시","통영시","남해군","하동군"]},
-    "김해시":{adjacent:["부산광역시","창원시","양산시","밀양시"]},
-    "밀양시":{adjacent:["김해시","창녕군","청도군","양산시"]},
-    "거제시":{adjacent:["통영시"]},
-    "양산시":{adjacent:["부산광역시","울산광역시","김해시","밀양시"]},
-    "의령군":{adjacent:["창원시","진주시","함안군","합천군"]},
-    "함안군":{adjacent:["창원시","진주시","의령군","창녕군"]},
-    "창녕군":{adjacent:["밀양시","함안군","영산군","고령군"]},
-    "고성군":{adjacent:["통영시","사천시","하동군"]},
-    "남해군":{adjacent:["사천시","하동군"]},
-    "하동군":{adjacent:["사천시","고성군","남해군","산청군","전라남도"]},
-    "산청군":{adjacent:["진주시","하동군","함양군","거창군","전라북도"]},
-    "함양군":{adjacent:["산청군","거창군","전라북도"]},
-    "거창군":{adjacent:["산청군","함양군","합천군","전라북도","경상북도"]},
-    "합천군":{adjacent:["의령군","거창군","고령군","대구광역시"]},
-
-    "제주시":{adjacent:["서귀포시"]},
-    "서귀포시":{adjacent:["제주시"]},
-  };
-
-  var DIFF = {};
-  Object.keys(REGIONS).forEach(function(r) {
-    var adjCount = REGIONS[r].adjacent.length;
-    if (adjCount >= 5) DIFF[r] = 1;
-    else if (adjCount >= 2) DIFF[r] = 2;
-    else DIFF[r] = 3;
-  });
-
-  var LB = [];
-
-  var G = {
-    active: false, timer: 0, intv: null,
-    queue: [], idx: 0, score: 0,
-    passLeft: 3, wrongCnt: 0,
-    log: [], locked: false,
-    emoji: null, hintUsed: false
-  };
-
-  function getDiff(score) {
-    return score < 8 ? 1 : score < 15 ? 2 : 3;
-  }
-
-  function buildQueue(maxDiff) {
-    var keys = Object.keys(REGIONS);
-    var validKeys = keys.filter(function(r){ return DIFF[r] <= maxDiff; });
-    return validKeys.sort(function(){ return Math.random() - 0.5; });
-  }
-
-  (function initGame() {
-    var grid = document.getElementById('egrid');
-    var startBtn = document.getElementById('gbtn');
-    var selEmoji = null;
-
-    FOOD_EMOJIS.forEach(function(em) {
-      var b = document.createElement('div');
-      b.className = 'eopt';
-      b.textContent = em;
-      b.addEventListener('click', function() {
-        grid.querySelectorAll('.eopt').forEach(function(x){ x.classList.remove('sel'); });
-        b.classList.add('sel');
-        selEmoji = em;
-        startBtn.disabled = false;
-        startBtn.textContent = em + '  시작!';
-        startBtn.classList.add('rdy');
-      });
-      grid.appendChild(b);
-    });
-
-    var eggBtn = document.getElementById('egg-trigger');
-    if (eggBtn) {
-      eggBtn.addEventListener('click', function(e) {
-        e.stopPropagation();
-        document.getElementById('game-overlay').classList.add('active');
-      });
-    }
-
-    startBtn.addEventListener('click', function() {
-      if (!selEmoji) return;
-      document.getElementById('game-overlay').classList.remove('active');
-      startGame(selEmoji);
-    });
-
-    document.getElementById('gpass-btn').addEventListener('click', passQ);
-    document.getElementById('ghint-btn').addEventListener('click', useHint);
-    document.getElementById('gexit-btn').addEventListener('click', exitGame);
-  })();
-
-  function startGame(emoji) {
-    G.active = true; G.timer = 60; G.score = 0;
-    G.passLeft = 3; G.wrongCnt = 0; G.log = [];
-    G.queue = buildQueue(getDiff(0));
-    G.idx = 0; G.locked = false; G.emoji = emoji; G.hintUsed = false;
-
-    document.getElementById('toolbar').style.display = 'none';
-    document.getElementById('ghud').classList.add('on');
-
-    updatePassBtn(); updateWrong();
-    nextQ();
-
-    clearInterval(G.intv);
-    G.intv = setInterval(function() {
-      G.timer--;
-      var t = document.getElementById('gtimer');
-      t.textContent = G.timer;
-      t.className = G.timer <= 10 ? 'red' : '';
-      if (G.timer <= 0) endGame();
-    }, 1000);
-
-    installClickHandler();
-  }
-
-  function nextQ() {
-    var newDiff = getDiff(G.score);
-    var curDiff = getDiff(Math.max(0, G.score - 1));
-    if (newDiff > curDiff || G.idx >= G.queue.length) {
-      G.queue = buildQueue(newDiff);
-      G.idx = 0;
-    }
-    G.wrongCnt = 0; G.hintUsed = false;
-    updateWrong();
-    document.getElementById('ghint-btn').disabled = false;
-    document.getElementById('gq').textContent = G.queue[G.idx];
-    document.getElementById('gscore').textContent = G.score;
-    hideHintPop();
-  }
-
-  var gameClickHandler = null;
-  function installClickHandler() {
-    var mapDiv = document.getElementById('map');
-    if (!mapDiv) return;
-
-    gameClickHandler = function(e) {
-      if (!G.active || G.locked) return;
-      var target = e.target;
-      if (!target || target.tagName !== 'path') return;
-      var clicked = target.getAttribute('data-sigungu');
-      if (!clicked) return;
-
-      var correct = G.queue[G.idx];
-      if (clicked === correct) {
-        G.score++; G.log.push({name:correct, result:'correct'});
-        colorRegion(clicked, '#66bb6a');
-        showFB('⭕', '#4caf50');
-        G.idx++;
-        document.getElementById('gscore').textContent = G.score;
-        setTimeout(nextQ, 350);
-      } else {
-        G.wrongCnt++;
-        colorRegion(clicked, '#ef5350');
-        showFB('❌', '#ef5350');
-        G.locked = true;
-        G.log.push({name:correct, result:'wrong'});
-        setTimeout(function() {
-          colorRegion(clicked, '');
-          G.locked = false;
-          if (G.wrongCnt >= 3) {
-            G.log.push({name:correct, result:'wrong3'});
-            colorRegion(correct, '#ffa726');
-            G.idx++;
-            setTimeout(nextQ, 300);
-          }
-          updateWrong();
-        }, 700);
-        updateWrong();
-      }
-    };
-
-    mapDiv.addEventListener('click', gameClickHandler);
-  }
-
-  function colorRegion(name, color) {
-    var paths = document.querySelectorAll('path[data-sigungu="' + name + '"]');
-    paths.forEach(function(p) {
-      if (color) p.style.fill = color;
-      else p.style.fill = '';
-    });
-  }
-
-  function passQ() {
-    if (G.passLeft <= 0 || !G.active) return;
-    var r = G.queue[G.idx];
-    G.log.push({name:r, result:'pass'});
-    colorRegion(r, '#ffa726');
-    G.passLeft--; G.idx++;
-    updatePassBtn();
-    nextQ();
-  }
-
-  function useHint() {
-    if (!G.active || G.hintUsed) return;
-    var r = G.queue[G.idx];
-    var adj = REGIONS[r] && REGIONS[r].adjacent;
-    G.hintUsed = true;
-    G.timer = Math.max(1, G.timer - 1);
-    document.getElementById('gtimer').textContent = G.timer;
-    document.getElementById('ghint-btn').disabled = true;
-    if (adj && adj.length) {
-      showHintPop('💡 주변 지역: ' + adj.join(', '));
-    } else {
-      showHintPop('💡 주변 지역 정보 없음');
-    }
-  }
-
-  function exitGame() {
-    clearInterval(G.intv);
-    G.active = false;
-    document.getElementById('ghud').classList.remove('on');
-    document.getElementById('toolbar').style.display = '';
-    hideHintPop();
-    var mapDiv = document.getElementById('map');
-    if (mapDiv && gameClickHandler) {
-      mapDiv.removeEventListener('click', gameClickHandler);
-      gameClickHandler = null;
-    }
-    var paths = document.querySelectorAll('path[data-sigungu]');
-    paths.forEach(function(p){ p.style.fill = ''; });
-  }
-
-  function endGame() {
-    clearInterval(G.intv);
-    G.active = false;
-    document.getElementById('ghud').classList.remove('on');
-    document.getElementById('toolbar').style.display = '';
-    hideHintPop();
-    var mapDiv = document.getElementById('map');
-    if (mapDiv && gameClickHandler) {
-      mapDiv.removeEventListener('click', gameClickHandler);
-      gameClickHandler = null;
-    }
-    if (G.emoji) {
-      LB.push({emoji: G.emoji, score: G.score});
-      LB.sort(function(a,b){ return b.score - a.score; });
-      if (LB.length > 10) LB = LB.slice(0, 10);
-    }
-    showResult();
-  }
-
-  function showResult() {
-    var corrects = G.log.filter(function(l){ return l.result === 'correct'; });
-    var wrong3   = G.log.filter(function(l){ return l.result === 'wrong3'; });
-    var passes   = G.log.filter(function(l){ return l.result === 'pass'; });
-    var myRank   = LB.findIndex(function(e){ return e.emoji === G.emoji && e.score === G.score; }) + 1;
-
-    var html = '<div class="grbox">';
-    html += '<h2>🗺️ 결과 ' + (G.emoji || '') + '</h2>';
-    html += '<div class="grsub">1분 동안 <b>' + G.score + '점</b> 획득!</div>';
-    html += '<div class="grbadges">';
-    html += '<div class="grbadge bc"><div class="n">' + corrects.length + '</div><div class="l">✅ 정답</div></div>';
-    html += '<div class="grbadge bw"><div class="n">' + wrong3.length + '</div><div class="l">❌ 3번 틀림</div></div>';
-    html += '<div class="grbadge bp"><div class="n">' + passes.length + '</div><div class="l">⏭️ 패스</div></div>';
-    html += '</div>';
-    if (corrects.length) html += '<div class="grsec">✅ 맞춘 지역 (' + corrects.length + ')</div><div class="grtags">' + corrects.map(function(l){ return '<span class="gtag tc">' + l.name + '</span>'; }).join('') + '</div>';
-    if (wrong3.length)   html += '<div class="grsec">❌ 3번 틀린 지역 (' + wrong3.length + ')</div><div class="grtags">' + wrong3.map(function(l){ return '<span class="gtag tw">' + l.name + '</span>'; }).join('') + '</div>';
-    if (passes.length)   html += '<div class="grsec">⏭️ 패스한 지역 (' + passes.length + ')</div><div class="grtags">' + passes.map(function(l){ return '<span class="gtag tp">' + l.name + '</span>'; }).join('') + '</div>';
-    html += '<div class="grbtns"><button class="grbtn grbtn-go" onclick="window.doRetry()">다시 하기</button><button class="grbtn grbtn-cl" onclick="window.doClose()">지도로 돌아가기</button></div>';
-    html += '</div>';
-
-    html += '<div class="lbbox"><h3>🏆 이번 세션 순위표</h3>';
-    if (LB.length === 0) {
-      html += '<div class="lbmt">아직 기록이 없어요</div>';
-    } else {
-      LB.forEach(function(e, i) {
-        var cls = i===0?'r1':i===1?'r2':i===2?'r3':'';
-        var isNew = (e.emoji === G.emoji && e.score === G.score && i+1 === myRank);
-        html += '<div class="lbrow"><span class="lbrnk ' + cls + '">' + (i+1) + '</span><span class="lbem">' + e.emoji + '</span>' + (isNew ? '<span class="lbnew">NEW</span>' : '') + '<span class="lbsc">' + e.score + '점</span></div>';
-      });
-    }
-    html += '</div>';
-
-    var rs = document.getElementById('gresult');
-    rs.innerHTML = html;
-    rs.classList.add('on');
-  }
-
-  window.doRetry = function() {
-    document.getElementById('gresult').classList.remove('on');
-    var paths = document.querySelectorAll('path[data-sigungu]');
-    paths.forEach(function(p){ p.style.fill = ''; });
-    document.getElementById('game-overlay').classList.add('active');
-  };
-
-  window.doClose = function() {
-    document.getElementById('gresult').classList.remove('on');
-    var paths = document.querySelectorAll('path[data-sigungu]');
-    paths.forEach(function(p){ p.style.fill = ''; });
-  };
-
-  function updatePassBtn() {
-    var b = document.getElementById('gpass-btn');
-    b.textContent = '⏭️ 패스 (' + G.passLeft + ')';
-    b.disabled = G.passLeft <= 0;
-  }
-  function updateWrong() {
-    var dots = ['○','○','○'].map(function(_,i){ return i < G.wrongCnt ? '●' : '○'; }).join('');
-    var el = document.getElementById('gwrong');
-    el.textContent = dots;
-    el.style.color = G.wrongCnt >= 3 ? '#ff5252' : G.wrongCnt >= 2 ? '#ff9800' : '#fff';
-  }
-  function showFB(text, color) {
-    var fb = document.getElementById('gfb');
-    fb.textContent = text; fb.style.color = color; fb.style.display = 'block';
-    fb.style.animation = 'none';
-    requestAnimationFrame(function(){ fb.style.animation = 'gbounce .6s ease forwards'; });
-    setTimeout(function(){ fb.style.display = 'none'; }, 600);
-  }
-  function showHintPop(text) {
-    var p = document.getElementById('ghint-pop');
-    p.textContent = text; p.style.display = 'block';
-  }
-  function hideHintPop() {
-    document.getElementById('ghint-pop').style.display = 'none';
-  }
-})();
-</script>
 </body>
 </html>
