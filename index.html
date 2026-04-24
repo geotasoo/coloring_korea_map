@@ -89,7 +89,7 @@
 </head>
 <body>
 <header style="background:#2E7D5E; color:#fff; padding:10px; font-size:18px; display:flex; justify-content:space-between; align-items:center; flex-shrink:0;">
-  <span>우리나라 지도 색칠하기 & 점찍기 🎗️🗺️🖌️🍺🍗🤪 v2.0 20260422</span>
+  <span>우리나라 지도 색칠하기 & 점찍기 🎗️🗺️🖌️🍺🍗🤪 v2.ㅇㅇ0 20260422</span>
   <div id="iconLinks" style="display:flex; gap:12px; align-items:center;">
     <span id="egg-trigger" style="cursor:pointer;font-size:18px;" title="">🐤</span>
     <a href="https://buymeacoffee.com/geotasoo" target="_blank" data-tip="커피보내기" style="color:#fff; font-size:18px; text-decoration:none;">☕</a>
@@ -643,14 +643,28 @@ Promise.all([
 
   function buildQueue(dummy) {
     var keys = Object.keys(REGIONS);
+    console.log('buildQueue: REGIONS has', keys.length, 'keys');
+    
+    if (keys.length === 0) {
+      console.error('ERROR: REGIONS is empty! Game cannot start.');
+      alert('지도 데이터를 로딩 중입니다. 잠시 후 다시 시도해주세요!');
+      return [];
+    }
+    
     // Exclude 광역시/특별시/특별자치시 - only keep 시/군/구
     var filteredKeys = keys.filter(function(r) {
       return !r.match(/(광역시|특별시|특별자치시)$/);
     });
-    console.log('buildQueue: total', keys.length, 'regions, after filter:', filteredKeys.length);
+    console.log('After filtering out 광역시/특별시:', filteredKeys.length, 'regions');
+    
+    if (filteredKeys.length === 0) {
+      console.error('ERROR: No regions after filtering!');
+      return keys; // Return all if filter removed everything
+    }
+    
     // Simple random shuffle
     var queue = filteredKeys.sort(function(){ return Math.random() - 0.5; });
-    console.log('Queue built, first 3:', queue.slice(0, 3));
+    console.log('Queue built, first 5:', queue.slice(0, 5));
     return queue;
   }
 
@@ -684,11 +698,14 @@ Promise.all([
   })();
 
   function startGame(emoji) {
+    console.log('=== STARTING GAME ===');
     window.GAME_ACTIVE = true;
     G.active = true; G.timer = 60; G.score = 0;
     G.passLeft = 3; G.wrongCnt = 0; G.log = [];
-    G.queue = buildQueue(getDiff(0));
+    G.queue = buildQueue(); // No parameter needed
     G.idx = 0; G.locked = false; G.emoji = emoji; G.hintUsed = false;
+    
+    console.log('Game initialized, queue length:', G.queue.length);
 
     // HIDE TOOLBAR
     document.getElementById('toolbar').style.display = 'none';
