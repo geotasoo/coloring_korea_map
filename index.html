@@ -83,7 +83,7 @@
 </head>
 <body>
 <header style="background:#2E7D5E; color:#fff; padding:10px; font-size:18px; display:flex; justify-content:space-between; align-items:center; flex-shrink:0;">
-  <span>우리나라 지도 색칠하기 & 점찍기 🎗️🗺️🖌️🍺🍗🤪 v2.0 20260424</span>
+  <span>우리나라 지도 색칠하기 & 점찍기 🎗️🗺️🖌️🍺🍗🤪 v2.0 20260422</span>
   <div id="iconLinks" style="display:flex; gap:12px; align-items:center;">
     <span id="egg-trigger" style="cursor:pointer;font-size:18px;" title="">🐤</span>
     <a href="https://buymeacoffee.com/geotasoo" target="_blank" data-tip="커피보내기" style="color:#fff; font-size:18px; text-decoration:none;">☕</a>
@@ -370,8 +370,8 @@ Promise.all([
       ly.on('click',()=>{if(dotMode)return;if(sgVisible){toggleSgLayerColor(ly);sdBorderLayer.bringToFront();}});
       if(ft.properties?.NL_NAME_2){
         const n=ft.properties.NL_NAME_2;
-        ly.on('mouseover',e=>showTT(n,e));
-        ly.on('mousemove',e=>showTT(n,e));
+        ly.on('mouseover',e=>{if(!window.GAME_ACTIVE)showTT(n,e);});
+        ly.on('mousemove',e=>{if(!window.GAME_ACTIVE)showTT(n,e);});
         ly.on('mouseout',hideTT);
         // Add data-sigungu after layer is created
         ly.on('add', function() {
@@ -542,7 +542,7 @@ Promise.all([
     <h2>🗺️ 지역 찾기</h2>
     <div class="grules">
       <b>📌 게임 방법</b><br>
-      • 1분 안에 시군구 이름을 보고 지도에서 찾아 클릭!<br>
+      • 1분 안에 시군 이름을 보고 지도에서 찾아 클릭!<br>
       • 3번 틀리면 자동으로 다음 지역으로 넘어가요<br>
       • 패스 3회 사용 가능<br>
       • <b>💡 힌트</b>: 주변 지역 표시 (단, <b>-1초</b> 패널티!)
@@ -821,6 +821,7 @@ Promise.all([
   })();
 
   function startGame(emoji) {
+    window.GAME_ACTIVE = true;
     G.active = true; G.timer = 60; G.score = 0;
     G.passLeft = 3; G.wrongCnt = 0; G.log = [];
     G.queue = buildQueue(getDiff(0));
@@ -884,9 +885,8 @@ Promise.all([
         colorRegion(clicked, '#ef5350');
         showFB('❌', '#ef5350');
         G.locked = true;
-        G.log.push({name:correct, result:'wrong'});
         setTimeout(function() {
-          colorRegion(clicked, '');
+          colorRegion(clicked, '');  // Clear the wrong answer color
           G.locked = false;
           if (G.wrongCnt >= 3) {
             G.log.push({name:correct, result:'wrong3'});
@@ -937,6 +937,7 @@ Promise.all([
   }
 
   function exitGame() {
+    window.GAME_ACTIVE = false;
     clearInterval(G.intv);
     G.active = false;
     document.getElementById('ghud').classList.remove('on');
@@ -952,6 +953,7 @@ Promise.all([
   }
 
   function endGame() {
+    window.GAME_ACTIVE = false;
     clearInterval(G.intv);
     G.active = false;
     document.getElementById('ghud').classList.remove('on');
