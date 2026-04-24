@@ -89,7 +89,7 @@
 </head>
 <body>
 <header style="background:#2E7D5E; color:#fff; padding:10px; font-size:18px; display:flex; justify-content:space-between; align-items:center; flex-shrink:0;">
-  <span>우리나라 지도 색칠하기 & 점찍기 🎗️🗺️🖌️🍺ㅇㅇㅇㅇㅇ🍗🤪 v2.0 20260422</span>
+  <span>우리나라 지도 색칠하기 & 점찍기 🎗️🗺️🖌️🍺🍗🤪 v2.0 20260422</span>
   <div id="iconLinks" style="display:flex; gap:12px; align-items:center;">
     <span id="egg-trigger" style="cursor:pointer;font-size:18px;" title="">🐤</span>
     <a href="https://buymeacoffee.com/geotasoo" target="_blank" data-tip="커피보내기" style="color:#fff; font-size:18px; text-decoration:none;">☕</a>
@@ -716,9 +716,10 @@ Promise.all([
     console.log('Clearing colors...');
     
     // 1. Clear ALL colors - Leaflet layers and game classes
-    // Clear the color maps
-    coloredSg.clear();
-    coloredSd.clear();
+    // Clear the color map (only sgLayer needed for game)
+    if (typeof coloredSg !== 'undefined') {
+      coloredSg.clear();
+    }
     
     // Reset all sgLayer styles
     if (typeof sgLayer !== 'undefined' && sgLayer) {
