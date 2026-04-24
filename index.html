@@ -497,9 +497,8 @@ Promise.all([
 .eopt{font-size:24px;background:#f5f5f5;border:2px solid transparent;border-radius:8px;padding:4px 7px;cursor:pointer;transition:all .15s;line-height:1.3;}
 .eopt:hover{background:#e8f5e9;transform:scale(1.1);}
 .eopt.sel{border-color:#2E7D5E;background:#e8f5e9;}
-#gbtn{background:#2E7D5E;color:#fff;border:none;border-radius:8px;padding:12px 36px;font-size:16px;cursor:pointer;font-weight:bold;opacity:.4;transition:opacity .2s;}
-#gbtn.rdy{opacity:1;}
-#gbtn.rdy:hover{background:#256b4e;}
+#gbtn{background:#0F6E56;color:#fff;border:none;border-radius:8px;padding:12px 36px;font-size:16px;cursor:pointer;font-weight:bold;transition:background .2s;}
+#gbtn:hover{background:#0a5240;}
 #ghud{display:none;position:fixed;top:0;left:0;right:0;z-index:5500;background:rgba(46,125,94,.96);color:#fff;height:76px;padding:0 20px;box-shadow:0 2px 10px rgba(0,0,0,.3);}
 #ghud.on{display:grid;grid-template-columns:180px 1fr 240px;align-items:center;}
 .hl{display:flex;gap:18px;}
@@ -571,9 +570,13 @@ Promise.all([
       • 패스 3회 사용 가능<br>
       • <b>💡 힌트</b>: 어느 도(道)인지 알려줌 (단, <b>-1초</b> 패널티!)
     </div>
-    <div class="epick-title">🍽️ 나의 음식 아이콘을 골라주세요</div>
-    <div class="egrid" id="egrid"></div>
-    <button id="gbtn" disabled>이모지를 선택하세요</button>
+    <div style="background:#ffebee;border:1px solid #ef5350;border-radius:8px;padding:10px 14px;margin:12px 0;font-size:12px;color:#c62828;line-height:1.6;">
+      <b>⚠️ 주의:</b> 게임 종료 후 지도로 돌아올 때 모든 색칠과 점이 초기화됩니다!
+    </div>
+    <div style="display:flex;gap:10px;justify-content:center;margin-top:16px;">
+      <button id="gbtn" style="background:#0F6E56;color:#fff;border:none;border-radius:8px;padding:12px 32px;font-size:16px;cursor:pointer;font-weight:bold;">🎮 시작!</button>
+      <button id="gcancel-btn" style="background:#eee;color:#333;border:none;border-radius:8px;padding:12px 32px;font-size:16px;cursor:pointer;font-weight:bold;">나가기</button>
+    </div>
   </div>
 </div>
 
@@ -635,38 +638,24 @@ Promise.all([
   };
 
   function getDiff(score) {
-    return score < 8 ? 1 : score < 15 ? 2 : 3;
+    return 0; // Not used anymore
   }
 
-  function buildQueue(maxDiff) {
+  function buildQueue(dummy) {
     var keys = Object.keys(REGIONS);
-    console.log('buildQueue called, REGIONS has', keys.length, 'keys, maxDiff:', maxDiff);
-    var validKeys = keys.filter(function(r){ return DIFF[r] <= maxDiff; });
-    console.log('validKeys:', validKeys.length, 'regions match difficulty');
-    var queue = validKeys.sort(function(){ return Math.random() - 0.5; });
-    console.log('Queue built:', queue.slice(0, 5));
+    // Exclude 광역시/특별시/특별자치시 - only keep 시/군/구
+    var filteredKeys = keys.filter(function(r) {
+      return !r.match(/(광역시|특별시|특별자치시)$/);
+    });
+    console.log('buildQueue: total', keys.length, 'regions, after filter:', filteredKeys.length);
+    // Simple random shuffle
+    var queue = filteredKeys.sort(function(){ return Math.random() - 0.5; });
+    console.log('Queue built, first 3:', queue.slice(0, 3));
     return queue;
   }
 
   (function initGame() {
-    var grid = document.getElementById('egrid');
     var startBtn = document.getElementById('gbtn');
-    var selEmoji = null;
-
-    FOOD_EMOJIS.forEach(function(em) {
-      var b = document.createElement('div');
-      b.className = 'eopt';
-      b.textContent = em;
-      b.addEventListener('click', function() {
-        grid.querySelectorAll('.eopt').forEach(function(x){ x.classList.remove('sel'); });
-        b.classList.add('sel');
-        selEmoji = em;
-        startBtn.disabled = false;
-        startBtn.textContent = em + '  시작!';
-        startBtn.classList.add('rdy');
-      });
-      grid.appendChild(b);
-    });
 
     var eggBtn = document.getElementById('egg-trigger');
     if (eggBtn) {
@@ -677,10 +666,17 @@ Promise.all([
     }
 
     startBtn.addEventListener('click', function() {
-      if (!selEmoji) return;
       document.getElementById('game-overlay').classList.remove('active');
-      startGame(selEmoji);
+      startGame(null); // No emoji needed
     });
+
+    // Cancel button
+    var cancelBtn = document.getElementById('gcancel-btn');
+    if (cancelBtn) {
+      cancelBtn.addEventListener('click', function() {
+        document.getElementById('game-overlay').classList.remove('active');
+      });
+    }
 
     document.getElementById('gpass-btn').addEventListener('click', passQ);
     document.getElementById('ghint-btn').addEventListener('click', useHint);
@@ -755,11 +751,10 @@ Promise.all([
   }
 
   function nextQ() {
-    var newDiff = getDiff(G.score);
-    var curDiff = getDiff(Math.max(0, G.score - 1));
-    if (newDiff > curDiff || G.idx >= G.queue.length) {
-      G.queue = buildQueue(newDiff);
-      G.idx = 0;
+    if (G.idx >= G.queue.length) {
+      // No more questions - shouldn't happen in 60 seconds
+      endGame();
+      return;
     }
     G.wrongCnt = 0; G.hintUsed = false;
     updateWrong();
@@ -871,8 +866,8 @@ Promise.all([
       mapDiv.removeEventListener('click', gameClickHandler);
       gameClickHandler = null;
     }
-    var paths = document.querySelectorAll('path[data-sigungu]');
-    paths.forEach(function(p){ p.style.fill = ''; });
+    // Complete reset - click reset button (reloads page)
+    document.getElementById('btn-reset').click();
   }
 
   function endGame() {
