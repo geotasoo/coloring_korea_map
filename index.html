@@ -89,7 +89,7 @@
 </head>
 <body>
 <header style="background:#2E7D5E; color:#fff; padding:10px; font-size:18px; display:flex; justify-content:space-between; align-items:center; flex-shrink:0;">
-  <span>우리나라 지도 색칠하기 & 점찍기 🎗️🗺️🖌️🍺🍗🤪 v2.ㅇㅇ0 20260422</span>
+  <span>우리나라 지도 색칠하기 & 점찍기 🎗️🗺️🖌️🍺🍗🤪 v2.0 20260422</span>
   <div id="iconLinks" style="display:flex; gap:12px; align-items:center;">
     <span id="egg-trigger" style="cursor:pointer;font-size:18px;" title="">🐤</span>
     <a href="https://buymeacoffee.com/geotasoo" target="_blank" data-tip="커피보내기" style="color:#fff; font-size:18px; text-decoration:none;">☕</a>
@@ -739,7 +739,9 @@ Promise.all([
 
     // 3. Clear all dots and pins
     if (typeof dotMarkers !== 'undefined') {
-      dotMarkers.forEach(function(m) { map.removeLayer(m); });
+      dotMarkers.forEach(function(m) { 
+        if (map && map.removeLayer) map.removeLayer(m);
+      });
       dotMarkers = [];
     }
     if (typeof selectedCities !== 'undefined') {
@@ -749,8 +751,8 @@ Promise.all([
       manualPins = [];
     }
 
-    // 4. Reset zoom to default view
-    map.setView([36.5, 127.5], 7);
+    // 4. Reset zoom - skip for now (map not in scope)
+    // map.setView([36.5, 127.5], 7);
 
     updatePassBtn(); updateWrong();
     nextQ();
