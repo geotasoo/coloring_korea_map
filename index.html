@@ -644,7 +644,34 @@ Promise.all([
 
     // ===== 완전 초기화 =====
     try {
-      // 모든 색칠 제거
+      // 1. 배경지도 끄기
+      if (typeof baseOn !== 'undefined' && baseOn) {
+        if (typeof baseLayer !== 'undefined') {
+          map.removeLayer(baseLayer);
+        }
+        baseOn = false;
+        var baseBtn = document.getElementById('btn-base');
+        if (baseBtn) baseBtn.textContent = '🌚 배경지도';
+      }
+      
+      // 2. 점찍기 모드 끄기 (패널도 함께 닫힘)
+      if (typeof dotMode !== 'undefined' && dotMode) {
+        if (typeof closePanels === 'function') {
+          closePanels();
+        }
+      }
+      
+      // 3. 모든 점 제거 (도시 점 + 수동 핀)
+      if (typeof dotMarkers !== 'undefined') {
+        dotMarkers.forEach(function(m) { 
+          try { map.removeLayer(m); } catch(e) {}
+        });
+        dotMarkers.length = 0;
+      }
+      if (typeof selectedCities !== 'undefined') selectedCities.clear();
+      if (typeof manualPins !== 'undefined') manualPins.length = 0;
+      
+      // 4. 모든 색칠 제거
       var paths = document.querySelectorAll('path[data-sigungu]');
       paths.forEach(function(p){ 
         p.style.fill = ''; 
@@ -656,6 +683,9 @@ Promise.all([
       if (typeof coloredSg !== 'undefined' && coloredSg.clear) {
         coloredSg.clear();
       }
+      if (typeof coloredSd !== 'undefined' && coloredSd.clear) {
+        coloredSd.clear();
+      }
       
       // sgLayer 스타일 리셋
       if (typeof sgLayer !== 'undefined' && sgLayer) {
@@ -664,21 +694,16 @@ Promise.all([
         });
       }
       
-      // 점 제거
-      if (typeof dotMarkers !== 'undefined') {
-        dotMarkers.forEach(function(m) { 
-          try { map.removeLayer(m); } catch(e) {}
-        });
-        dotMarkers.length = 0;
+      // 5. 북측/남측 경계 숨기기
+      if (typeof nkVisible !== 'undefined' && nkVisible && typeof nkLayer !== 'undefined' && nkLayer) {
+        map.removeLayer(nkLayer);
+        nkVisible = false;
+        var nkBtn = document.getElementById('btn-nk');
+        if (nkBtn) nkBtn.textContent = '🌑 북측';
       }
-      if (typeof selectedCities !== 'undefined') selectedCities.clear();
-      if (typeof manualPins !== 'undefined') manualPins.length = 0;
-      
-      // 패널 닫기
-      var cityPanel = document.getElementById('city-panel');
-      var pinPanel = document.getElementById('pin-panel');
-      if (cityPanel) cityPanel.classList.remove('open');
-      if (pinPanel) pinPanel.classList.remove('open');
+      if (typeof skLayer !== 'undefined' && skLayer) {
+        try { map.removeLayer(skLayer); } catch(e) {}
+      }
     } catch(e) {
       console.warn('Reset partial:', e);
     }
