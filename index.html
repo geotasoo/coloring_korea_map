@@ -89,7 +89,7 @@
 </head>
 <body>
 <header style="background:#2E7D5E; color:#fff; padding:10px; font-size:18px; display:flex; justify-content:space-between; align-items:center; flex-shrink:0;">
-  <span>우리나라 지도 색칠하기 & 점찍기 🎗️🗺️🖌️🍺🍗🤪 v2.0 20260422</span>
+  <span>우리나라 지도 색칠하기 & 점찍기 🎗️🗺️🖌️🍺ㅇㅇㅇㅇㅇ🍗🤪 v2.0 20260422</span>
   <div id="iconLinks" style="display:flex; gap:12px; align-items:center;">
     <span id="egg-trigger" style="cursor:pointer;font-size:18px;" title="">🐤</span>
     <a href="https://buymeacoffee.com/geotasoo" target="_blank" data-tip="커피보내기" style="color:#fff; font-size:18px; text-decoration:none;">☕</a>
@@ -713,18 +713,26 @@ Promise.all([
 
     // ========== COMPLETE RESET FOR GAME ==========
     
+    console.log('Clearing colors...');
+    
     // 1. Clear ALL colors - Leaflet layers and game classes
-    if (typeof coloredSg !== 'undefined') {
-      coloredSg.clear();
-    }
+    // Clear the color maps
+    coloredSg.clear();
+    coloredSd.clear();
+    
+    // Reset all sgLayer styles
     if (typeof sgLayer !== 'undefined' && sgLayer) {
       sgLayer.eachLayer(function(layer) {
-        layer.setStyle(getSgStyle(layer));
+        layer.setStyle({fillColor: '#ffffff', fillOpacity: 0});
       });
     }
-    var paths = document.querySelectorAll('path[data-sigungu]');
-    paths.forEach(function(p){ 
+    
+    // Force clear all path elements
+    var allPaths = document.querySelectorAll('path[data-sigungu], path.sigungu, svg path');
+    console.log('Found', allPaths.length, 'paths to clear');
+    allPaths.forEach(function(p){ 
       p.style.fill = ''; 
+      p.style.fillOpacity = '';
       p.classList.remove('gcor', 'gwfl', 'gpas');
     });
 
@@ -801,8 +809,11 @@ Promise.all([
       if (clicked === correct) {
         // Correct answer - green
         G.score++; G.log.push({name:correct, result:'correct'});
-        var paths = document.querySelectorAll('path[data-sigungu="' + clicked + '"]');
-        paths.forEach(function(p){ p.classList.add('gcor'); });
+        var correctPaths = document.querySelectorAll('path[data-sigungu="' + clicked + '"]');
+        correctPaths.forEach(function(p){ 
+          p.style.fill = ''; // Clear inline style first
+          p.classList.add('gcor'); 
+        });
         showFB('⭕', '#4caf50');
         G.idx++;
         document.getElementById('gscore').textContent = G.score;
@@ -810,20 +821,25 @@ Promise.all([
       } else {
         // Wrong answer - red, then clear
         G.wrongCnt++;
-        var paths = document.querySelectorAll('path[data-sigungu="' + clicked + '"]');
-        paths.forEach(function(p){ p.classList.add('gwfl'); });
+        var wrongPaths = document.querySelectorAll('path[data-sigungu="' + clicked + '"]');
+        wrongPaths.forEach(function(p){ 
+          p.style.fill = ''; // Clear inline style first
+          p.classList.add('gwfl'); 
+        });
         showFB('❌', '#ef5350');
         G.locked = true;
         setTimeout(function() {
           // Clear red color
-          var paths = document.querySelectorAll('path[data-sigungu="' + clicked + '"]');
-          paths.forEach(function(p){ p.classList.remove('gwfl'); });
+          wrongPaths.forEach(function(p){ p.classList.remove('gwfl'); });
           G.locked = false;
           if (G.wrongCnt >= 3) {
-            // 3 wrong - show answer in orange
+            // 3 wrong - show answer in RED (not orange!)
             G.log.push({name:correct, result:'wrong3'});
             var correctPaths = document.querySelectorAll('path[data-sigungu="' + correct + '"]');
-            correctPaths.forEach(function(p){ p.classList.add('gpas'); });
+            correctPaths.forEach(function(p){ 
+              p.style.fill = ''; // Clear inline style first
+              p.classList.add('gwfl');  // RED for wrong3
+            });
             G.idx++;
             setTimeout(nextQ, 300);
           }
@@ -850,8 +866,11 @@ Promise.all([
     var r = G.queue[G.idx];
     G.log.push({name:r, result:'pass'});
     // Show passed region in orange
-    var paths = document.querySelectorAll('path[data-sigungu="' + r + '"]');
-    paths.forEach(function(p){ p.classList.add('gpas'); });
+    var passPaths = document.querySelectorAll('path[data-sigungu="' + r + '"]');
+    passPaths.forEach(function(p){ 
+      p.style.fill = ''; // Clear inline style first
+      p.classList.add('gpas'); 
+    });
     G.passLeft--; G.idx++;
     updatePassBtn();
     nextQ();
