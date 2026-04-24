@@ -569,7 +569,7 @@ Promise.all([
       • 1분 안에 시군 이름을 보고 지도에서 찾아 클릭!<br>
       • 3번 틀리면 자동으로 다음 지역으로 넘어가요<br>
       • 패스 3회 사용 가능<br>
-      • <b>💡 힌트</b>: 인접 지역 표시 (단, <b>-1초</b> 패널티!)
+      • <b>💡 힌트</b>: 어느 도(道)인지 알려줌 (단, <b>-1초</b> 패널티!)
     </div>
     <div class="epick-title">🍽️ 나의 음식 아이콘을 골라주세요</div>
     <div class="egrid" id="egrid"></div>
@@ -621,79 +621,18 @@ Promise.all([
 
   // Build REGIONS from GeoJSON after map loads
   window.initializeRegions = function(sgJson) {
-    // First pass: create all regions
     sgJson.features.forEach(function(feature) {
       var name = feature.properties.NL_NAME_2;
+      var province = feature.properties.NL_NAME_1; // 시도 (도/특별시/광역시)
       if (name && !REGIONS[name]) {
         REGIONS[name] = {
-          adjacent: [],
-          geometry: feature.geometry
+          province: province // Store province for hint
         };
         DIFF[name] = name.length <= 3 ? 1 : name.length <= 4 ? 2 : 3;
       }
     });
-
-    // Second pass: find adjacent regions by checking if geometries touch
-    var regionNames = Object.keys(REGIONS);
-    for (var i = 0; i < regionNames.length; i++) {
-      var name1 = regionNames[i];
-      var geom1 = REGIONS[name1].geometry;
-      
-      for (var j = i + 1; j < regionNames.length; j++) {
-        var name2 = regionNames[j];
-        var geom2 = REGIONS[name2].geometry;
-        
-        // Check if geometries are adjacent (share a border)
-        if (geometriesAdjacent(geom1, geom2)) {
-          REGIONS[name1].adjacent.push(name2);
-          REGIONS[name2].adjacent.push(name1);
-        }
-      }
-    }
-    
     console.log('REGIONS initialized:', Object.keys(REGIONS).length, 'regions');
-    // Log a sample to verify adjacency
-    var sample = Object.keys(REGIONS)[0];
-    console.log('Sample region', sample, 'adjacent to:', REGIONS[sample].adjacent);
   };
-
-  // Check if two geometries share a border (simplified check)
-  function geometriesAdjacent(geom1, geom2) {
-    // Get coordinates from both geometries
-    var coords1 = getAllCoordinates(geom1);
-    var coords2 = getAllCoordinates(geom2);
-    
-    // Check if any coordinates are very close (within threshold)
-    var threshold = 0.0001; // ~10 meters
-    for (var i = 0; i < coords1.length; i++) {
-      for (var j = 0; j < coords2.length; j++) {
-        var dx = coords1[i][0] - coords2[j][0];
-        var dy = coords1[i][1] - coords2[j][1];
-        var dist = Math.sqrt(dx * dx + dy * dy);
-        if (dist < threshold) {
-          return true;
-        }
-      }
-    }
-    return false;
-  }
-
-  // Extract all coordinates from a geometry
-  function getAllCoordinates(geometry) {
-    var coords = [];
-    if (geometry.type === 'Polygon') {
-      geometry.coordinates.forEach(function(ring) {
-        coords = coords.concat(ring);
-      });
-    } else if (geometry.type === 'MultiPolygon') {
-      geometry.coordinates.forEach(function(polygon) {
-        polygon.forEach(function(ring) {
-          coords = coords.concat(ring);
-        });
-      });
-    }
-    return coords;
-  }
 
   function getDiff(score) {
     return score < 8 ? 1 : score < 15 ? 2 : 3;
@@ -907,20 +846,16 @@ Promise.all([
   function useHint() {
     if (!G.active || G.hintUsed) return;
     var r = G.queue[G.idx];
-    var adj = REGIONS[r] && REGIONS[r].adjacent;
+    var province = REGIONS[r] && REGIONS[r].province;
     G.hintUsed = true;
     G.timer = Math.max(1, G.timer - 1);
     document.getElementById('gtimer').textContent = G.timer;
     document.getElementById('ghint-btn').disabled = true;
     
-    if (adj && adj.length > 0) {
-      // Remove 시/군/구 suffix from adjacent region names for display
-      var displayNames = adj.map(function(name) {
-        return name.replace(/(시|군|구)$/, '');
-      });
-      showHintPop('💡 인접 지역: ' + displayNames.join(', '));
+    if (province) {
+      showHintPop('💡 힌트: ' + province + '에 있습니다');
     } else {
-      showHintPop('💡 인접 지역 정보 없음');
+      showHintPop('💡 힌트 정보 없음');
     }
   }
 
