@@ -197,7 +197,8 @@ const KOREA_CITIES=[
 const SIDO_ORDER=["특별·광역·특별자치시","도·특별자치도청","섬·산·고개","경기도","강원특별자치도","충청북도","충청남도","전북특별자치도","전라남도","경상북도","경상남도","제주특별자치도","북측"];
 
 let selectedCities=new Set(), dotMarkers=[], dotMode=false, sidoCollapsed=new Set(SIDO_ORDER), manualPins=[];
-let nkVisible=false;
+let nkVisible=false; // 기본값: 북한 꺼짐
+// 경계 모드: 0=없애기, 1=나라, 2=시도, 3=시군 (기본: 3=시군)
 const BORDER_MODES=['경계없음','남측','시도','시군'];
 let borderMode=3;
 const $=id=>document.getElementById(id);
@@ -225,10 +226,12 @@ $('dotStroke').addEventListener('change',renderDots);
 map.on('zoomend',()=>{ if(dotMarkers.length>0) renderDots(); });
 $('btn-base').addEventListener('click',()=>{baseOn=!baseOn;if(baseOn){map.addLayer(baseLayer);$('btn-base').textContent='🌝 배경지도';}else{map.removeLayer(baseLayer);$('btn-base').textContent='🌚 배경지도';}});
 
+// 패널
 function openPanels(){dotMode=true;$('city-panel').classList.add('open');$('pin-panel').classList.add('open');$('btn-dot-panel').textContent='✅ 점찍기 완료';$('btn-dot-panel').classList.add('active');map.getContainer().style.cursor='crosshair';buildDotList('');buildPinList();}
 function closePanels(){dotMode=false;$('city-panel').classList.remove('open');$('pin-panel').classList.remove('open');$('btn-dot-panel').textContent='📍 점찍기';$('btn-dot-panel').classList.remove('active');map.getContainer().style.cursor='';}
 $('btn-dot-panel').addEventListener('click',()=>{if(dotMode)closePanels();else openPanels();});
 
+// 북측 토글: ON/OFF + 화면 맞춤
 $('btn-nk').addEventListener('click',()=>{
   nkVisible=!nkVisible;
   const btn=$('btn-nk');
@@ -244,6 +247,7 @@ $('btn-nk').addEventListener('click',()=>{
   fitMapBounds();
 });
 
+// 화면 맞춤 함수
 function fitMapBounds(){
   const layers=[];
   if(borderMode===1 && skLayer) layers.push(skLayer);
@@ -311,7 +315,9 @@ function buildPinList(){
 function renderDots(){
   dotMarkers.forEach(m=>map.removeLayer(m));dotMarkers=[];
   const r=parseFloat($('dotSize').value),color=$('dotColor').value,stroke=$('dotStroke').checked;
+  // circle은 미터 단위 - 슬라이더 값을 미터로 변환 (1→3000m, 12→36000m)
   const radiusM = r * 3000;
+  // 현재 줌에서 반지름이 몇 픽셀인지 계산해서 테두리 비율 맞춤
   const c = map.getCenter();
   const p1 = map.latLngToContainerPoint(c);
   const p2 = map.latLngToContainerPoint(L.latLng(c.lat, c.lng + radiusM / (111320 * Math.cos(c.lat * Math.PI / 180))));
@@ -338,6 +344,7 @@ Promise.all([
   fetch('202604_sk.geojson').then(r=>r.json())
 ]).then(([sdJson,sgJson,nkJson,skJson])=>{
 
+  // 북한 레이어 (토글 가능, 색칠 가능) - 기본 숨김
   nkLayer = L.geoJSON(nkJson,{
     style: ()=>({color:'#333', weight:parseFloat($('slider-nk').value), fillColor:'#ffffff', fillOpacity:defaultLandOpacity, opacity:1}),
     onEachFeature:(ft,ly)=>{
@@ -349,8 +356,9 @@ Promise.all([
       });
       ly.on('mouseout',hideTT);
     }
-  });
+  }); // 기본 숨김 - addTo(map) 안 함
 
+  // 속성명: NL_NAME_1 (시도), NL_NAME_2 (시군)
   provinceNames=[...new Set(sdJson.features.map(f=>f.properties.NL_NAME_1))].sort();
   const pc=$('provinceCheckboxes');pc.innerHTML='';
   provinceNames.forEach(n=>{const l=document.createElement('label');l.innerHTML=`<input type="checkbox" value="${n}" checked> ${n}`;pc.appendChild(l);});
@@ -366,7 +374,6 @@ Promise.all([
   }});}
 
   function createSgLayer(f){return L.geoJSON(sgJson,{filter:f,style:getSgStyle,onEachFeature:(ft,ly)=>{
-    if(ft.properties?.NL_NAME_2) ly.getElement().setAttribute('data-sigungu', ft.properties.NL_NAME_2);
     ly.on('click',()=>{if(dotMode)return;if(sgVisible){toggleSgLayerColor(ly);sdBorderLayer.bringToFront();}});
     if(ft.properties?.NL_NAME_2){const n=ft.properties.NL_NAME_2;ly.on('mouseover',e=>showTT(n,e));ly.on('mousemove',e=>showTT(n,e));ly.on('mouseout',hideTT);}
   }});}
@@ -380,11 +387,14 @@ Promise.all([
     const sel=Array.from(selectedProvinces);
     const ff=sel.length===0?(f=>false):(f=>sel.includes(f.properties.NL_NAME_1));
 
+    // borderMode: 0=없애기, 1=나라(sd fill만), 2=시도(sd fill+border), 3=시군(sg)
     if(borderMode===0){
+      // 없애기: 아무것도 안 그림
       sdLayer=L.geoJSON({type:'FeatureCollection',features:[]}).addTo(map);
       sgLayer=L.geoJSON({type:'FeatureCollection',features:[]});
       sdBorderLayer=L.geoJSON({type:'FeatureCollection',features:[]}).addTo(map);
     } else if(borderMode===1){
+      // 나라: 남한 전체 윤곽(sk) + 나라 경계
       if(skLayer)map.removeLayer(skLayer);
       skLayer=L.geoJSON(skJson,{
         style:()=>({color:'#333',weight:parseFloat($('slider-nk').value),fillColor:'#ffffff',fillOpacity:defaultLandOpacity,opacity:1}),
@@ -394,12 +404,14 @@ Promise.all([
       sgLayer=L.geoJSON({type:'FeatureCollection',features:[]});
       sdBorderLayer=L.geoJSON({type:'FeatureCollection',features:[]}).addTo(map);
     } else if(borderMode===2){
+      // 시도: sd fill + 시도 경계
       sdLayer=createSdLayer(ff).addTo(map);
       sgLayer=L.geoJSON({type:'FeatureCollection',features:[]});
       sdBorderLayer=L.geoJSON(sdJson,{filter:ff,style:()=>({color:'#222',weight:parseFloat($('slider-sd').value),fillOpacity:0,opacity:1}),interactive:false}).addTo(map);
       sdLayer.setStyle({fillOpacity:defaultLandOpacity,opacity:1});
       sdBorderLayer.bringToFront();
     } else {
+      // 시군(3): sg + sd border
       sdLayer=createSdLayer(ff).addTo(map);
       sgLayer=createSgLayer(ff);
       sdBorderLayer=L.geoJSON(sdJson,{filter:ff,style:()=>({color:'#222',weight:parseFloat($('slider-sd').value),fillOpacity:0,opacity:1}),interactive:false}).addTo(map);
@@ -413,6 +425,7 @@ Promise.all([
   }
   updateLayers();
 
+  // 경계 버튼: 없애기 → 나라 → 시도 → 시군 순환
   function updateBorderBtn(){
     const btn=$('btn-sg');
     const labels=['경계없음 →','남측 →','시도 →','시군 →'];
@@ -446,593 +459,421 @@ Promise.all([
 </script>
 
  <!-- 
-  ===== 이스터에그: 🗺️ 지역 찾기 게임 =====
+  ===== 이스터에그: ⚾ 숫자야구 =====
+ 
 -->
 
 <style>
-#game-overlay{display:none;position:fixed;inset:0;z-index:5000;background:rgba(0,0,0,.72);align-items:center;justify-content:center;}
-#game-overlay.active{display:flex;}
-.gbox{background:#fff;border-radius:16px;padding:32px 38px;width:460px;max-width:94vw;max-height:90vh;overflow-y:auto;box-shadow:0 8px 40px rgba(0,0,0,.3);text-align:center;}
-.gbox h2{margin:0 0 10px;font-size:24px;}
-.grules{background:#f8f8f8;border-radius:8px;padding:12px 16px;font-size:13px;color:#555;line-height:1.9;text-align:left;margin-bottom:16px;}
-.grules b{color:#2E7D5E;}
-.epick-title{font-size:13px;color:#666;margin-bottom:8px;}
-.egrid{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin-bottom:12px;}
-.eopt{font-size:24px;background:#f5f5f5;border:2px solid transparent;border-radius:8px;padding:4px 7px;cursor:pointer;transition:all .15s;line-height:1.3;}
-.eopt:hover{background:#e8f5e9;transform:scale(1.1);}
-.eopt.sel{border-color:#2E7D5E;background:#e8f5e9;}
-#gbtn{background:#2E7D5E;color:#fff;border:none;border-radius:8px;padding:12px 36px;font-size:16px;cursor:pointer;font-weight:bold;opacity:.4;transition:opacity .2s;}
-#gbtn.rdy{opacity:1;}
-#gbtn.rdy:hover{background:#256b4e;}
-#ghud{display:none;position:fixed;top:0;left:0;right:0;z-index:5500;background:rgba(46,125,94,.96);color:#fff;height:76px;padding:0 20px;box-shadow:0 2px 10px rgba(0,0,0,.3);}
-#ghud.on{display:grid;grid-template-columns:180px 1fr 240px;align-items:center;}
-.hl{display:flex;gap:18px;}
-.hc{display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;}
-.hr{display:flex;align-items:center;gap:8px;justify-content:flex-end;}
-.hbtns{display:flex;gap:8px;}
-.hc-row{display:flex;align-items:center;justify-content:center;gap:12px;margin-top:4px;}
-.hblk{display:flex;flex-direction:column;align-items:center;}
-.hlbl{font-size:10px;opacity:.7;margin-bottom:1px;}
-#gtimer{font-size:28px;font-weight:bold;line-height:1;transition:color .3s;}
-#gtimer.red{color:#ff5252;}
-#gscore{font-size:24px;font-weight:bold;line-height:1;}
-#gq{font-size:26px;font-weight:bold;letter-spacing:.3px;}
-#gwrong{font-size:16px;margin-top:4px;letter-spacing:4px;}
-#ghint-btn{background:rgba(255,255,255,.22);border:1px solid rgba(255,255,255,.5);color:#fff;border-radius:6px;padding:4px 10px;font-size:12px;cursor:pointer;white-space:nowrap;}
-#ghint-btn:hover{background:rgba(255,213,0,.3);}
-#ghint-btn:disabled{opacity:.4;cursor:not-allowed;}
-#gpass-btn{background:rgba(255,255,255,.22);border:1px solid rgba(255,255,255,.5);color:#fff;border-radius:6px;padding:4px 10px;font-size:12px;cursor:pointer;}
-#gpass-btn:hover{background:rgba(255,255,255,.26);}
-#gpass-btn:disabled{opacity:.4;cursor:not-allowed;}
-#gexit-btn{background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.32);color:#fff;border-radius:6px;padding:5px 9px;font-size:12px;cursor:pointer;}
-#gexit-btn:hover{background:rgba(255,255,255,.2);}
-#ghint-pop{display:none;position:fixed;top:70px;left:50%;transform:translateX(-50%);z-index:5600;background:rgba(20,20,20,.9);color:#ffe066;padding:8px 18px;border-radius:8px;font-size:14px;font-weight:bold;pointer-events:none;white-space:nowrap;}
-#gfb{display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:6000;font-size:54px;pointer-events:none;animation:gbounce .6s ease forwards;}
-@keyframes gbounce{0%{opacity:0;transform:translate(-50%,-64%) scale(.5)}30%{opacity:1;transform:translate(-50%,-50%) scale(1.2)}70%{opacity:1;transform:translate(-50%,-50%) scale(1)}100%{opacity:0;transform:translate(-50%,-44%) scale(.9)}}
-#gresult{display:none;position:fixed;inset:0;z-index:6000;background:rgba(0,0,0,.62);justify-content:flex-start;align-items:center;flex-direction:column;padding-top:20px;overflow-y:auto;}
-#gresult.on{display:flex;}
-.grbox{background:#fff;border-radius:16px;padding:24px 28px;width:520px;max-width:96vw;box-shadow:0 8px 40px rgba(0,0,0,.3);margin-bottom:12px;}
-.grbox h2{margin:0 0 3px;font-size:20px;text-align:center;}
-.grsub{text-align:center;color:#888;font-size:12px;margin-bottom:12px;}
-.grbadges{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-bottom:12px;}
-.grbadge{border-radius:10px;padding:7px 14px;text-align:center;min-width:70px;}
-.grbadge .n{font-size:26px;font-weight:bold;}
-.grbadge .l{font-size:11px;}
-.bc{background:#e8f5e9;color:#2e7d32;}
-.bw{background:#ffebee;color:#c62828;}
-.bp{background:#fff8e1;color:#e65100;}
-.grsec{font-size:11px;font-weight:bold;color:#aaa;margin:10px 0 5px;border-top:1px solid #eee;padding-top:8px;}
-.grtags{display:flex;flex-wrap:wrap;gap:4px;}
-.gtag{padding:3px 9px;border-radius:20px;font-size:12px;}
-.tc{background:#e8f5e9;color:#2e7d32;}
-.tw{background:#ffebee;color:#c62828;}
-.tp{background:#fff8e1;color:#e65100;}
-.grbtns{display:flex;gap:10px;margin-top:14px;justify-content:center;}
-.grbtn{border:none;border-radius:8px;padding:10px 22px;font-size:14px;cursor:pointer;font-weight:bold;}
-.grbtn-go{background:#2E7D5E;color:#fff;}
-.grbtn-go:hover{background:#256b4e;}
-.grbtn-cl{background:#eee;color:#333;}
-.grbtn-cl:hover{background:#ddd;}
-.lbbox{background:#fff;border-radius:16px;padding:18px 26px;width:520px;max-width:96vw;box-shadow:0 4px 20px rgba(0,0,0,.15);margin-bottom:24px;}
-.lbbox h3{margin:0 0 10px;font-size:15px;}
-.lbrow{display:flex;align-items:center;gap:10px;padding:5px 0;border-bottom:1px solid #f5f5f5;font-size:14px;}
-.lbrow:last-child{border-bottom:none;}
-.lbrnk{min-width:22px;font-weight:bold;color:#bbb;font-size:13px;}
-.lbrnk.r1{color:#f6a000;}.lbrnk.r2{color:#888;}.lbrnk.r3{color:#cd7f32;}
-.lbem{font-size:20px;}
-.lbsc{margin-left:auto;font-weight:bold;color:#2E7D5E;}
-.lbnew{font-size:10px;background:#e8f5e9;color:#2e7d32;border-radius:10px;padding:1px 6px;margin-left:4px;}
-.lbmt{color:#bbb;font-size:13px;text-align:center;padding:10px 0;}
+#nb-overlay {
+  display:none; position:fixed; inset:0; z-index:99999;
+  background:rgba(0,0,0,0.5); backdrop-filter:blur(4px);
+  justify-content:center; align-items:center;
+  font-family:'Courier New', monospace;
+}
+#nb-overlay.active { display:flex; }
+#nb-box {
+  background:#f5f5f5; border-radius:16px; overflow:hidden;
+  width:400px; max-width:95vw; max-height:92vh;
+  box-shadow:0 8px 32px rgba(0,0,0,0.2);
+  animation:nbIn .35s cubic-bezier(.22,.68,0,1.15);
+  display:flex; flex-direction:column;
+}
+@keyframes nbIn { from{transform:translateY(28px) scale(0.95);opacity:0} to{transform:none;opacity:1} }
+
+/* 헤더 */
+#nb-head {
+  background:linear-gradient(135deg,#2E7D5E,#4CAF50);
+  padding:12px 18px; display:flex; justify-content:space-between; align-items:center;
+  border-bottom:2px solid #2E7D5E; flex-shrink:0;
+}
+#nb-head .nh-title { color:#fff; font-size:15px; font-weight:bold; letter-spacing:1px; }
+#nb-head .nh-meta { color:#e8f5e9; font-size:12px; display:flex; gap:12px; }
+#nb-head .nh-meta span b { color:#fff; }
+#nb-close { background:none; border:none; color:#fff; font-size:20px; cursor:pointer; padding:0 2px; opacity:0.9; }
+#nb-close:hover { opacity:1; }
+
+/* 입력 영역 */
+#nb-input-area { padding:16px 18px 12px; flex-shrink:0; border-bottom:1px solid #ddd; background:#fff; }
+#nb-display {
+  display:flex; gap:8px; justify-content:center; margin-bottom:12px;
+}
+.nb-digit {
+  width:52px; height:60px; border-radius:10px;
+  border:2px solid #bbb; background:#fafafa;
+  display:flex; align-items:center; justify-content:center;
+  font-size:28px; font-weight:bold; color:#2E7D5E;
+  transition:all .15s;
+  position:relative;
+}
+.nb-digit.active { border-color:#2E7D5E; box-shadow:0 0 0 3px rgba(46,125,94,0.1); background:#fff; }
+.nb-digit.filled { border-color:#2E7D5E; color:#1a4d3a; background:#e8f5e9; }
+.nb-digit .nd-label {
+  position:absolute; top:3px; left:6px; font-size:9px; color:#999; font-family:sans-serif;
+}
+
+/* 숫자 버튼 */
+#nb-numpad { display:grid; grid-template-columns:repeat(5,1fr); gap:6px; margin-bottom:10px; }
+.nb-num {
+  padding:10px 0; border-radius:8px; border:1px solid #ccc;
+  background:#fff; color:#333; font-size:16px; font-weight:bold;
+  cursor:pointer; text-align:center; transition:all .15s; font-family:'Courier New',monospace;
+}
+.nb-num:hover { background:#2E7D5E; border-color:#2E7D5E; color:#fff; }
+.nb-num:active { transform:scale(0.93); }
+.nb-num.used { opacity:0.3; pointer-events:none; }
+
+/* 액션 버튼 */
+#nb-actions { display:flex; gap:8px; }
+#nb-del {
+  flex:1; padding:10px; border-radius:8px; border:1px solid #ddd;
+  background:#fff; color:#e53935; font-size:13px; cursor:pointer;
+  font-family:'Courier New',monospace; transition:all .15s; font-weight:bold;
+}
+#nb-del:hover { background:#ffebee; border-color:#e53935; }
+#nb-submit {
+  flex:2; padding:10px; border-radius:8px; border:2px solid #2E7D5E;
+  background:#2E7D5E; color:#fff; font-size:13px; font-weight:bold;
+  cursor:pointer; font-family:'Courier New',monospace; transition:all .15s;
+  opacity:0.4; pointer-events:none;
+}
+#nb-submit.ready { opacity:1; pointer-events:auto; }
+#nb-submit.ready:hover { background:#256b4e; }
+
+/* 기록 */
+#nb-history-wrap {
+  flex:1; overflow-y:auto; padding:10px 18px 14px; background:#fafafa;
+  scrollbar-width:thin; scrollbar-color:#ccc transparent;
+}
+#nb-history-wrap::-webkit-scrollbar { width:4px; }
+#nb-history-wrap::-webkit-scrollbar-thumb { background:#ccc; border-radius:2px; }
+.nb-hist-empty { color:#999; font-size:12px; text-align:center; padding:20px 0; }
+.nb-hist-row {
+  display:flex; align-items:center; gap:10px;
+  padding:6px 10px; border-radius:6px; margin-bottom:4px;
+  background:#fff; border:1px solid #e0e0e0;
+  font-size:13px; animation:histIn .2s ease;
+}
+@keyframes histIn { from{opacity:0;transform:translateX(-8px)} to{opacity:1;transform:none} }
+.nb-hist-row .hr-num { color:#999; font-size:11px; min-width:20px; }
+.nb-hist-row .hr-guess { color:#222; font-weight:bold; letter-spacing:3px; flex:1; }
+.nb-hist-row .hr-result { display:flex; gap:6px; }
+.hr-s { color:#2E7D5E; font-weight:bold; font-size:13px; }
+.hr-b { color:#f57c00; font-weight:bold; font-size:13px; }
+.hr-out { color:#999; font-size:12px; }
+
+/* 기록 패널 (최고기록) */
+#nb-records-wrap { padding:0 18px 14px; flex-shrink:0; border-top:1px solid #ddd; background:#fafafa; }
+#nb-records-title { color:#666; font-size:10px; padding:8px 0 4px; letter-spacing:1px; }
+#nb-records-list { display:flex; gap:6px; flex-wrap:wrap; }
+.nb-rec-chip {
+  background:#fff; border:1px solid #e0e0e0; border-radius:20px;
+  padding:3px 10px; font-size:11px; color:#666;
+}
+.nb-rec-chip b { color:#2E7D5E; }
+
+/* 정답 오버레이 */
+#nb-win {
+  display:none; position:absolute; inset:0; z-index:10;
+  background:rgba(255,255,255,0.96); flex-direction:column;
+  justify-content:center; align-items:center; text-align:center;
+  border-radius:16px;
+}
+#nb-win.show { display:flex; }
+#nb-win .nw-emoji { font-size:56px; margin-bottom:10px; animation:nwPop .5s cubic-bezier(.22,.68,0,1.4); }
+#nb-win .nw-title { color:#2E7D5E; font-size:22px; font-weight:bold; margin-bottom:6px; }
+#nb-win .nw-detail { color:#555; font-size:13px; margin-bottom:24px; line-height:1.8; }
+#nb-win .nw-btns { display:flex; gap:10px; }
+#nb-win button {
+  padding:10px 22px; border-radius:8px; font-size:13px; font-weight:bold;
+  cursor:pointer; font-family:'Courier New',monospace; border:none;
+}
+#nw-retry { background:#2E7D5E; color:#fff; }
+#nw-retry:hover { background:#256b4e; }
+#nw-close-win { background:#ddd; color:#555; }
+#nw-close-win:hover { background:#ccc; color:#333; }
+@keyframes nwPop { from{transform:scale(0.3) rotate(-20deg);opacity:0} to{transform:none;opacity:1} }
+
+/* 폭죽 캔버스 */
+#nb-confetti { position:absolute; inset:0; pointer-events:none; border-radius:16px; z-index:11; }
 </style>
 
-<div id="game-overlay">
-  <div class="gbox">
-    <h2>🗺️ 지역 찾기</h2>
-    <div class="grules">
-      <b>📌 게임 방법</b><br>
-      • 1분 안에 시군구 이름을 보고 지도에서 찾아 클릭!<br>
-      • 3번 틀리면 자동으로 다음 지역으로 넘어가요<br>
-      • 패스 3회 사용 가능<br>
-      • <b>💡 힌트</b>: 주변 지역 표시 (단, <b>-1초</b> 패널티!)
+<div id="nb-overlay">
+  <div id="nb-box" style="position:relative;">
+    <canvas id="nb-confetti"></canvas>
+    <div id="nb-head">
+      <span class="nh-title">⚾ 숫자야구</span>
+      <div class="nh-meta">
+        <span>시도 <b id="nb-tries">0</b></span>
+        <span>⏱ <b id="nb-timer">0.0</b>s</span>
+      </div>
+      <button id="nb-close">✕</button>
     </div>
-    <div class="epick-title">🍽️ 나의 음식 아이콘을 골라주세요</div>
-    <div class="egrid" id="egrid"></div>
-    <button id="gbtn" disabled>이모지를 선택하세요</button>
-  </div>
-</div>
 
-<div id="ghud">
-  <div class="hl">
-    <div class="hblk"><div class="hlbl">남은 시간</div><div id="gtimer">60</div></div>
-    <div class="hblk"><div class="hlbl">점수</div><div id="gscore">0</div></div>
-  </div>
-  <div class="hc">
-    <div id="gq">—</div>
-    <div class="hc-row">
-      <div id="gwrong">○○○</div>
-      <div class="hbtns">
-        <button id="ghint-btn">💡 힌트 (-1초)</button>
-        <button id="gpass-btn">⏭️ 패스 (3)</button>
+    <div id="nb-input-area">
+      <div id="nb-display">
+        <div class="nb-digit active" id="nd0"><span class="nd-label">1번째</span>?</div>
+        <div class="nb-digit" id="nd1"><span class="nd-label">2번째</span>?</div>
+        <div class="nb-digit" id="nd2"><span class="nd-label">3번째</span>?</div>
+      </div>
+      <div id="nb-numpad"></div>
+      <div id="nb-actions">
+        <button id="nb-del">⌫ 지우기</button>
+        <button id="nb-submit">⚾ 던지기!</button>
+      </div>
+    </div>
+
+    <div id="nb-history-wrap">
+      <div class="nb-hist-empty" id="nb-empty">숫자를 입력하고 던져보세요! 🎯</div>
+      <div id="nb-hist-list"></div>
+    </div>
+
+    <div id="nb-records-wrap">
+      <div id="nb-records-title">🏆 최고 기록 (시도 횟수 기준)</div>
+      <div id="nb-records-list"><span style="color:#999;font-size:11px;">아직 기록 없음</span></div>
+    </div>
+
+    <div id="nb-win">
+      <div class="nw-emoji">🎉</div>
+      <div class="nw-title">정답!</div>
+      <div class="nw-detail" id="nw-detail"></div>
+      <div class="nw-btns">
+        <button id="nw-retry">🔄 다시 하기</button>
+        <button id="nw-close-win">닫기</button>
       </div>
     </div>
   </div>
-  <div class="hr">
-    <button id="gexit-btn">나가기</button>
-  </div>
 </div>
-<div id="ghint-pop"></div>
-<div id="gfb"></div>
-<div id="gresult"></div>
 
 <script>
-(function() {
-  var FOOD_EMOJIS = ['🍕','🍔','🍜','🍣','🌮','🍩','🍦','🍗','🥗','🍱','🥐','🍛','🧆','🥩','🍤','🍙','🥘','🍝','🥪','🫕','🍢','🍖','🥟','🫔'];
+(function(){
+  /* ── 트리거 ── */
+  var egg = document.getElementById('egg-trigger');
+  if(egg) egg.addEventListener('click', function(e){ e.stopPropagation(); openGame(); });
 
-  var REGIONS = {
-    "서울특별시":{adjacent:["인천광역시","경기도"]},
-    "부산광역시":{adjacent:["울산광역시","경상남도","김해시","양산시"]},
-    "대구광역시":{adjacent:["경상북도","경산시","청도군","고령군"]},
-    "인천광역시":{adjacent:["서울특별시","경기도","김포시","부천시"]},
-    "광주광역시":{adjacent:["전라남도","화순군","담양군","장성군"]},
-    "대전광역시":{adjacent:["세종특별자치시","충청남도","충청북도","금산군","청주시","공주시"]},
-    "울산광역시":{adjacent:["부산광역시","경상남도","경상북도","양산시","경주시"]},
-    "세종특별자치시":{adjacent:["대전광역시","충청남도","충청북도","공주시","청주시"]},
-    "수원시":{adjacent:["용인시","화성시","의왕시","군포시","안산시"]},
-    "성남시":{adjacent:["서울특별시","광주시","하남시","용인시"]},
-    "고양시":{adjacent:["서울특별시","파주시","양주시","의정부시"]},
-    "용인시":{adjacent:["수원시","성남시","안성시","평택시","화성시"]},
-    "부천시":{adjacent:["서울특별시","인천광역시","김포시","시흥시"]},
-    "안산시":{adjacent:["수원시","시흥시","화성시","군포시"]},
-    "안양시":{adjacent:["서울특별시","과천시","군포시","의왕시"]},
-    "남양주시":{adjacent:["서울특별시","구리시","하남시","양평군","가평군"]},
-    "화성시":{adjacent:["수원시","안산시","평택시","오산시","용인시"]},
-    "평택시":{adjacent:["화성시","안성시","아산시","당진시"]},
-    "의정부시":{adjacent:["서울특별시","양주시","동두천시","포천시"]},
-    "시흥시":{adjacent:["안산시","부천시","광명시","안양시"]},
-    "파주시":{adjacent:["고양시","연천군","김포시"]},
-    "김포시":{adjacent:["서울특별시","인천광역시","부천시","고양시","파주시"]},
-    "광명시":{adjacent:["서울특별시","부천시","시흥시"]},
-    "광주시":{adjacent:["성남시","하남시","양평군","여주시"]},
-    "군포시":{adjacent:["수원시","안양시","안산시","의왕시"]},
-    "이천시":{adjacent:["광주시","여주시","안성시","충청북도"]},
-    "양주시":{adjacent:["의정부시","동두천시","포천시","연천군"]},
-    "오산시":{adjacent:["수원시","화성시","평택시"]},
-    "구리시":{adjacent:["서울특별시","남양주시"]},
-    "안성시":{adjacent:["용인시","이천시","평택시","충청북도"]},
-    "포천시":{adjacent:["의정부시","양주시","가평군","강원특별자치도"]},
-    "의왕시":{adjacent:["수원시","안양시","군포시","과천시"]},
-    "하남시":{adjacent:["서울특별시","성남시","광주시","남양주시"]},
-    "여주시":{adjacent:["광주시","이천시","양평군","충청북도"]},
-    "동두천시":{adjacent:["의정부시","양주시","연천군"]},
-    "과천시":{adjacent:["서울특별시","안양시","의왕시"]},
-    "가평군":{adjacent:["남양주시","포천시","양평군","강원특별자치도"]},
-    "양평군":{adjacent:["남양주시","광주시","여주시","가평군","강원특별자치도"]},
-    "연천군":{adjacent:["파주시","동두천시","양주시","포천시"]},
-    
-    "춘천시":{adjacent:["홍천군","화천군","양구군","인제군"]},
-    "원주시":{adjacent:["횡성군","영월군","평창군","충청북도"]},
-    "강릉시":{adjacent:["평창군","정선군","동해시","양양군"]},
-    "동해시":{adjacent:["강릉시","삼척시"]},
-    "태백시":{adjacent:["삼척시","정선군","경상북도"]},
-    "속초시":{adjacent:["양양군","고성군","인제군"]},
-    "삼척시":{adjacent:["동해시","태백시","경상북도"]},
-    "홍천군":{adjacent:["춘천시","횡성군","인제군","평창군"]},
-    "횡성군":{adjacent:["원주시","홍천군","평창군"]},
-    "영월군":{adjacent:["원주시","평창군","정선군","경상북도","충청북도"]},
-    "평창군":{adjacent:["원주시","강릉시","홍천군","영월군","정선군"]},
-    "정선군":{adjacent:["강릉시","태백시","영월군","평창군"]},
-    "철원군":{adjacent:["화천군","김화군"]},
-    "화천군":{adjacent:["춘천시","철원군","양구군","인제군"]},
-    "양구군":{adjacent:["춘천시","화천군","인제군"]},
-    "인제군":{adjacent:["춘천시","속초시","홍천군","화천군","양구군","고성군","양양군"]},
-    "고성군":{adjacent:["속초시","인제군","양양군"]},
-    "양양군":{adjacent:["강릉시","속초시","인제군","고성군"]},
+  /* ── 상태 ── */
+  var answer=[], current=[], tries=0, timerStart=0, timerInterval=null;
+  var records = JSON.parse(localStorage.getItem('nb_records')||'[]');
 
-    "청주시":{adjacent:["대전광역시","세종특별자치시","보은군","옥천군","진천군","증평군"]},
-    "충주시":{adjacent:["제천시","음성군","괴산군","경상북도"]},
-    "제천시":{adjacent:["충주시","단양군","경상북도","강원특별자치도"]},
-    "보은군":{adjacent:["청주시","옥천군","괴산군","경상북도"]},
-    "옥천군":{adjacent:["청주시","보은군","영동군","전라북도"]},
-    "영동군":{adjacent:["옥천군","전라북도","경상북도"]},
-    "증평군":{adjacent:["청주시","괴산군","진천군"]},
-    "진천군":{adjacent:["청주시","증평군","음성군","경기도"]},
-    "괴산군":{adjacent:["청주시","충주시","보은군","증평군"]},
-    "음성군":{adjacent:["충주시","진천군","경기도"]},
-    "단양군":{adjacent:["제천시","경상북도","강원특별자치도"]},
+  /* ── DOM ── */
+  var overlay = document.getElementById('nb-overlay');
+  var triesEl = document.getElementById('nb-tries');
+  var timerEl = document.getElementById('nb-timer');
+  var histList = document.getElementById('nb-hist-list');
+  var emptyEl = document.getElementById('nb-empty');
+  var winEl = document.getElementById('nb-win');
+  var nwDetail = document.getElementById('nw-detail');
+  var submitBtn = document.getElementById('nb-submit');
+  var digits = [document.getElementById('nd0'),document.getElementById('nd1'),document.getElementById('nd2')];
+  var numpad = document.getElementById('nb-numpad');
+  var confCanvas = document.getElementById('nb-confetti');
+  var confCtx = confCanvas.getContext('2d');
 
-    "천안시":{adjacent:["아산시","세종특별자치시","공주시","청주시"]},
-    "공주시":{adjacent:["대전광역시","세종특별자치시","천안시","논산시","부여군"]},
-    "보령시":{adjacent:["서천군","청양군","홍성군"]},
-    "아산시":{adjacent:["천안시","평택시","당진시","예산군"]},
-    "서산시":{adjacent:["당진시","태안군","홍성군"]},
-    "논산시":{adjacent:["대전광역시","공주시","부여군","전라북도"]},
-    "계룡시":{adjacent:["대전광역시","공주시","논산시"]},
-    "당진시":{adjacent:["아산시","서산시","평택시"]},
-    "금산군":{adjacent:["대전광역시","전라북도","충청북도"]},
-    "부여군":{adjacent:["공주시","논산시","서천군","청양군"]},
-    "서천군":{adjacent:["보령시","부여군","전라북도"]},
-    "청양군":{adjacent:["보령시","부여군","공주시","홍성군"]},
-    "홍성군":{adjacent:["보령시","청양군","서산시","예산군"]},
-    "예산군":{adjacent:["아산시","홍성군","당진시"]},
-    "태안군":{adjacent:["서산시"]},
+  /* ── 숫자패드 생성 ── */
+  for(var i=0;i<=9;i++){
+    (function(n){
+      var btn = document.createElement('button');
+      btn.className='nb-num'; btn.textContent=n; btn.dataset.n=n;
+      btn.addEventListener('click', function(){ inputDigit(n); });
+      numpad.appendChild(btn);
+    })(i);
+  }
 
-    "전주시":{adjacent:["익산시","완주군","진안군","김제시"]},
-    "군산시":{adjacent:["익산시","김제시","부안군"]},
-    "익산시":{adjacent:["전주시","군산시","김제시","완주군"]},
-    "정읍시":{adjacent:["김제시","부안군","고창군","순창군","전라남도"]},
-    "남원시":{adjacent:["완주군","임실군","순창군","경상남도"]},
-    "김제시":{adjacent:["전주시","군산시","익산시","정읍시","부안군"]},
-    "완주군":{adjacent:["전주시","익산시","남원시","진안군","임실군"]},
-    "진안군":{adjacent:["전주시","완주군","무주군","장수군","충청남도"]},
-    "무주군":{adjacent:["진안군","장수군","경상북도","충청북도"]},
-    "장수군":{adjacent:["진안군","무주군","임실군","경상남도","경상북도"]},
-    "임실군":{adjacent:["완주군","남원시","장수군","순창군"]},
-    "순창군":{adjacent:["정읍시","남원시","임실군","전라남도"]},
-    "고창군":{adjacent:["정읍시","부안군","전라남도"]},
-    "부안군":{adjacent:["군산시","김제시","정읍시","고창군"]},
+  /* ── 입력 ── */
+  function inputDigit(n){
+    if(current.length>=3) return;
+    if(current.includes(n)) return;
+    current.push(n);
+    updateDisplay();
+    if(current.length===3){ submitBtn.classList.add('ready'); }
+  }
 
-    "목포시":{adjacent:["무안군","신안군","영암군"]},
-    "여수시":{adjacent:["순천시","광양시","고흥군"]},
-    "순천시":{adjacent:["여수시","광양시","구례군","고흥군","보성군"]},
-    "나주시":{adjacent:["광주광역시","화순군","영암군","무안군","함평군"]},
-    "광양시":{adjacent:["여수시","순천시","구례군","경상남도"]},
-    "담양군":{adjacent:["광주광역시","곡성군","전라북도"]},
-    "곡성군":{adjacent:["담양군","순천군","구례군","전라북도"]},
-    "구례군":{adjacent:["순천시","광양시","곡성군","경상남도"]},
-    "고흥군":{adjacent:["여수시","순천시","보성군"]},
-    "보성군":{adjacent:["순천시","고흥군","화순군","장흥군"]},
-    "화순군":{adjacent:["광주광역시","나주시","보성군","순천군","담양군"]},
-    "장흥군":{adjacent:["보성군","강진군","영암군"]},
-    "강진군":{adjacent:["장흥군","영암군","해남군"]},
-    "해남군":{adjacent:["강진군","영암군","완도군","진도군"]},
-    "영암군":{adjacent:["목포시","나주시","장흥군","강진군","해남군","무안군"]},
-    "무안군":{adjacent:["목포시","나주시","영암군","함평군","신안군"]},
-    "함평군":{adjacent:["나주시","무안군","영광군","장성군"]},
-    "영광군":{adjacent:["함평군","장성군","전라북도"]},
-    "장성군":{adjacent:["광주광역시","함평군","영광군","담양군","전라북도"]},
-    "완도군":{adjacent:["해남군","진도군"]},
-    "진도군":{adjacent:["해남군","완도군"]},
-    "신안군":{adjacent:["목포시","무안군"]},
+  function deleteDigit(){
+    if(!current.length) return;
+    current.pop();
+    submitBtn.classList.remove('ready');
+    updateDisplay();
+  }
 
-    "포항시":{adjacent:["경주시","영덕군","청송군","영천시"]},
-    "경주시":{adjacent:["울산광역시","포항시","영천시","청도군"]},
-    "김천시":{adjacent:["구미시","성주군","전라북도","충청북도"]},
-    "안동시":{adjacent:["영주시","봉화군","의성군","청송군"]},
-    "구미시":{adjacent:["김천시","칠곡군","군위군","성주군"]},
-    "영주시":{adjacent:["안동시","봉화군","예천군","충청북도","강원특별자치도"]},
-    "영천시":{adjacent:["포항시","경주시","청도군","경산시"]},
-    "상주시":{adjacent:["문경시","예천군","의성군","충청북도"]},
-    "문경시":{adjacent:["상주시","예천군","충청북도"]},
-    "경산시":{adjacent:["대구광역시","영천시","청도군","자인군"]},
-    "의성군":{adjacent:["안동시","상주시","군위군","청송군"]},
-    "청송군":{adjacent:["포항시","안동시","의성군","영덕군"]},
-    "영양군":{adjacent:["안동시","봉화군","영덕군"]},
-    "영덕군":{adjacent:["포항시","청송군","영양군"]},
-    "청도군":{adjacent:["경주시","영천시","경산시","밀양시"]},
-    "고령군":{adjacent:["대구광역시","구미시","성주군","합천군"]},
-    "성주군":{adjacent:["김천시","구미시","고령군","칠곡군"]},
-    "칠곡군":{adjacent:["대구광역시","구미시","성주군","군위군"]},
-    "예천군":{adjacent:["영주시","상주시","문경시","의성군"]},
-    "봉화군":{adjacent:["안동시","영주시","영양군","강원특별자치도"]},
-    "울진군":{adjacent:["봉화군","강원특별자치도"]},
-    "울릉군":{adjacent:[]},
-    "군위군":{adjacent:["구미시","칠곡군","의성군"]},
+  function updateDisplay(){
+    digits.forEach(function(d,i){
+      d.classList.remove('active','filled');
+      if(i < current.length){
+        d.textContent = current[i];
+        d.innerHTML = '<span class="nd-label">'+(i+1)+'번째</span>'+current[i];
+        d.classList.add('filled');
+      } else {
+        d.innerHTML = '<span class="nd-label">'+(i+1)+'번째</span>?';
+        if(i === current.length) d.classList.add('active');
+      }
+    });
+    document.querySelectorAll('.nb-num').forEach(function(btn){
+      var n = parseInt(btn.dataset.n);
+      if(current.includes(n)) btn.classList.add('used');
+      else btn.classList.remove('used');
+    });
+  }
 
-    "창원시":{adjacent:["진주시","김해시","함안군","의령군"]},
-    "진주시":{adjacent:["창원시","사천시","산청군","의령군","함안군"]},
-    "통영시":{adjacent:["거제시","고성군","사천시"]},
-    "사천시":{adjacent:["진주시","통영시","남해군","하동군"]},
-    "김해시":{adjacent:["부산광역시","창원시","양산시","밀양시"]},
-    "밀양시":{adjacent:["김해시","창녕군","청도군","양산시"]},
-    "거제시":{adjacent:["통영시"]},
-    "양산시":{adjacent:["부산광역시","울산광역시","김해시","밀양시"]},
-    "의령군":{adjacent:["창원시","진주시","함안군","합천군"]},
-    "함안군":{adjacent:["창원시","진주시","의령군","창녕군"]},
-    "창녕군":{adjacent:["밀양시","함안군","영산군","고령군"]},
-    "고성군":{adjacent:["통영시","사천시","하동군"]},
-    "남해군":{adjacent:["사천시","하동군"]},
-    "하동군":{adjacent:["사천시","고성군","남해군","산청군","전라남도"]},
-    "산청군":{adjacent:["진주시","하동군","함양군","거창군","전라북도"]},
-    "함양군":{adjacent:["산청군","거창군","전라북도"]},
-    "거창군":{adjacent:["산청군","함양군","합천군","전라북도","경상북도"]},
-    "합천군":{adjacent:["의령군","거창군","고령군","대구광역시"]},
-
-    "제주시":{adjacent:["서귀포시"]},
-    "서귀포시":{adjacent:["제주시"]},
-  };
-
-  var DIFF = {};
-  Object.keys(REGIONS).forEach(function(r) {
-    var adjCount = REGIONS[r].adjacent.length;
-    if (adjCount >= 5) DIFF[r] = 1;
-    else if (adjCount >= 2) DIFF[r] = 2;
-    else DIFF[r] = 3;
+  document.getElementById('nb-del').addEventListener('click', deleteDigit);
+  submitBtn.addEventListener('click', function(){
+    if(current.length===3) doGuess();
   });
 
-  var LB = [];
-
-  var G = {
-    active: false, timer: 0, intv: null,
-    queue: [], idx: 0, score: 0,
-    passLeft: 3, wrongCnt: 0,
-    log: [], locked: false,
-    emoji: null, hintUsed: false
-  };
-
-  function getDiff(score) {
-    return score < 8 ? 1 : score < 15 ? 2 : 3;
+  /* ── 게임 시작 ── */
+  function openGame(){
+    overlay.classList.add('active');
+    startNew();
   }
-
-  function buildQueue(maxDiff) {
-    var keys = Object.keys(REGIONS);
-    var validKeys = keys.filter(function(r){ return DIFF[r] <= maxDiff; });
-    return validKeys.sort(function(){ return Math.random() - 0.5; });
+  function closeGame(){
+    overlay.classList.remove('active');
+    clearInterval(timerInterval);
   }
+  document.getElementById('nb-close').addEventListener('click', closeGame);
+  overlay.addEventListener('click', function(e){ if(e.target===this) closeGame(); });
+  document.getElementById('nw-retry').addEventListener('click', startNew);
+  document.getElementById('nw-close-win').addEventListener('click', closeGame);
 
-  (function initGame() {
-    var grid = document.getElementById('egrid');
-    var startBtn = document.getElementById('gbtn');
-    var selEmoji = null;
-
-    FOOD_EMOJIS.forEach(function(em) {
-      var b = document.createElement('div');
-      b.className = 'eopt';
-      b.textContent = em;
-      b.addEventListener('click', function() {
-        grid.querySelectorAll('.eopt').forEach(function(x){ x.classList.remove('sel'); });
-        b.classList.add('sel');
-        selEmoji = em;
-        startBtn.disabled = false;
-        startBtn.textContent = em + '  시작!';
-        startBtn.classList.add('rdy');
-      });
-      grid.appendChild(b);
-    });
-
-    var eggBtn = document.getElementById('egg-trigger');
-    if (eggBtn) {
-      eggBtn.addEventListener('click', function(e) {
-        e.stopPropagation();
-        document.getElementById('game-overlay').classList.add('active');
-      });
+  function startNew(){
+    var pool=[0,1,2,3,4,5,6,7,8,9];
+    answer=[];
+    while(answer.length<3){
+      var idx=Math.floor(Math.random()*pool.length);
+      answer.push(pool.splice(idx,1)[0]);
     }
-
-    startBtn.addEventListener('click', function() {
-      if (!selEmoji) return;
-      document.getElementById('game-overlay').classList.remove('active');
-      startGame(selEmoji);
-    });
-
-    document.getElementById('gpass-btn').addEventListener('click', passQ);
-    document.getElementById('ghint-btn').addEventListener('click', useHint);
-    document.getElementById('gexit-btn').addEventListener('click', exitGame);
-  })();
-
-  function startGame(emoji) {
-    G.active = true; G.timer = 60; G.score = 0;
-    G.passLeft = 3; G.wrongCnt = 0; G.log = [];
-    G.queue = buildQueue(getDiff(0));
-    G.idx = 0; G.locked = false; G.emoji = emoji; G.hintUsed = false;
-
-    document.getElementById('toolbar').style.display = 'none';
-    document.getElementById('ghud').classList.add('on');
-
-    updatePassBtn(); updateWrong();
-    nextQ();
-
-    clearInterval(G.intv);
-    G.intv = setInterval(function() {
-      G.timer--;
-      var t = document.getElementById('gtimer');
-      t.textContent = G.timer;
-      t.className = G.timer <= 10 ? 'red' : '';
-      if (G.timer <= 0) endGame();
-    }, 1000);
-
-    installClickHandler();
+    current=[]; tries=0;
+    histList.innerHTML='';
+    emptyEl.style.display='block';
+    winEl.classList.remove('show');
+    submitBtn.classList.remove('ready');
+    triesEl.textContent='0';
+    timerEl.textContent='0.0';
+    clearInterval(timerInterval);
+    timerStart=Date.now();
+    timerInterval=setInterval(function(){
+      timerEl.textContent=((Date.now()-timerStart)/1000).toFixed(1);
+    },100);
+    updateDisplay();
+    stopConfetti();
+    renderRecords();
   }
 
-  function nextQ() {
-    var newDiff = getDiff(G.score);
-    var curDiff = getDiff(Math.max(0, G.score - 1));
-    if (newDiff > curDiff || G.idx >= G.queue.length) {
-      G.queue = buildQueue(newDiff);
-      G.idx = 0;
+  /* ── 판정 ── */
+  function doGuess(){
+    tries++;
+    triesEl.textContent=tries;
+    var s=0,b=0;
+    for(var i=0;i<3;i++){
+      if(current[i]===answer[i]) s++;
+      else if(answer.includes(current[i])) b++;
     }
-    G.wrongCnt = 0; G.hintUsed = false;
-    updateWrong();
-    document.getElementById('ghint-btn').disabled = false;
-    document.getElementById('gq').textContent = G.queue[G.idx];
-    document.getElementById('gscore').textContent = G.score;
-    hideHintPop();
-  }
-
-  var gameClickHandler = null;
-  function installClickHandler() {
-    var mapDiv = document.getElementById('map');
-    if (!mapDiv) return;
-
-    gameClickHandler = function(e) {
-      if (!G.active || G.locked) return;
-      var target = e.target;
-      if (!target || target.tagName !== 'path') return;
-      var clicked = target.getAttribute('data-sigungu');
-      if (!clicked) return;
-
-      var correct = G.queue[G.idx];
-      if (clicked === correct) {
-        G.score++; G.log.push({name:correct, result:'correct'});
-        colorRegion(clicked, '#66bb6a');
-        showFB('⭕', '#4caf50');
-        G.idx++;
-        document.getElementById('gscore').textContent = G.score;
-        setTimeout(nextQ, 350);
-      } else {
-        G.wrongCnt++;
-        colorRegion(clicked, '#ef5350');
-        showFB('❌', '#ef5350');
-        G.locked = true;
-        G.log.push({name:correct, result:'wrong'});
-        setTimeout(function() {
-          colorRegion(clicked, '');
-          G.locked = false;
-          if (G.wrongCnt >= 3) {
-            G.log.push({name:correct, result:'wrong3'});
-            colorRegion(correct, '#ffa726');
-            G.idx++;
-            setTimeout(nextQ, 300);
-          }
-          updateWrong();
-        }, 700);
-        updateWrong();
-      }
-    };
-
-    mapDiv.addEventListener('click', gameClickHandler);
-  }
-
-  function colorRegion(name, color) {
-    var paths = document.querySelectorAll('path[data-sigungu="' + name + '"]');
-    paths.forEach(function(p) {
-      if (color) p.style.fill = color;
-      else p.style.fill = '';
-    });
-  }
-
-  function passQ() {
-    if (G.passLeft <= 0 || !G.active) return;
-    var r = G.queue[G.idx];
-    G.log.push({name:r, result:'pass'});
-    colorRegion(r, '#ffa726');
-    G.passLeft--; G.idx++;
-    updatePassBtn();
-    nextQ();
-  }
-
-  function useHint() {
-    if (!G.active || G.hintUsed) return;
-    var r = G.queue[G.idx];
-    var adj = REGIONS[r] && REGIONS[r].adjacent;
-    G.hintUsed = true;
-    G.timer = Math.max(1, G.timer - 1);
-    document.getElementById('gtimer').textContent = G.timer;
-    document.getElementById('ghint-btn').disabled = true;
-    if (adj && adj.length) {
-      showHintPop('💡 주변 지역: ' + adj.join(', '));
-    } else {
-      showHintPop('💡 주변 지역 정보 없음');
+    var guessStr = current.join('');
+    addHistory(tries, guessStr, s, b);
+    current=[];
+    submitBtn.classList.remove('ready');
+    updateDisplay();
+    if(s===3){
+      clearInterval(timerInterval);
+      var elapsed = ((Date.now()-timerStart)/1000).toFixed(1);
+      saveRecord(tries, elapsed);
+      setTimeout(function(){ showWin(tries, elapsed); }, 300);
     }
   }
 
-  function exitGame() {
-    clearInterval(G.intv);
-    G.active = false;
-    document.getElementById('ghud').classList.remove('on');
-    document.getElementById('toolbar').style.display = '';
-    hideHintPop();
-    var mapDiv = document.getElementById('map');
-    if (mapDiv && gameClickHandler) {
-      mapDiv.removeEventListener('click', gameClickHandler);
-      gameClickHandler = null;
+  function addHistory(n, guess, s, b){
+    emptyEl.style.display='none';
+    var row = document.createElement('div');
+    row.className='nb-hist-row';
+    var res='';
+    if(s===0&&b===0) res='<span class="hr-out">OUT</span>';
+    else {
+      if(s>0) res+='<span class="hr-s">'+s+'S</span>';
+      if(b>0) res+='<span class="hr-b">'+b+'B</span>';
     }
-    var paths = document.querySelectorAll('path[data-sigungu]');
-    paths.forEach(function(p){ p.style.fill = ''; });
+    row.innerHTML='<span class="hr-num">'+n+'.</span><span class="hr-guess">'+guess.split('').join(' ')+'</span><span class="hr-result">'+res+'</span>';
+    histList.appendChild(row);
+    var wrap = document.getElementById('nb-history-wrap');
+    wrap.scrollTop = wrap.scrollHeight;
   }
 
-  function endGame() {
-    clearInterval(G.intv);
-    G.active = false;
-    document.getElementById('ghud').classList.remove('on');
-    document.getElementById('toolbar').style.display = '';
-    hideHintPop();
-    var mapDiv = document.getElementById('map');
-    if (mapDiv && gameClickHandler) {
-      mapDiv.removeEventListener('click', gameClickHandler);
-      gameClickHandler = null;
-    }
-    if (G.emoji) {
-      LB.push({emoji: G.emoji, score: G.score});
-      LB.sort(function(a,b){ return b.score - a.score; });
-      if (LB.length > 10) LB = LB.slice(0, 10);
-    }
-    showResult();
+  /* ── 승리 ── */
+  function showWin(tries, elapsed){
+    var msg = tries<=3 ? '🌟 천재 야구선수!' : tries<=6 ? '👏 훌륭해요!' : tries<=9 ? '😄 잘했어요!' : '😅 고생했어요!';
+    nwDetail.innerHTML = '정답: <b style="color:#2E7D5E;font-size:20px;letter-spacing:4px;">'+answer.join(' ')+'</b><br>시도 <b style="color:#333;">'+tries+'</b>번 &nbsp;|&nbsp; <b style="color:#333;">'+elapsed+'</b>초<br><span style="color:#2E7D5E;">'+msg+'</span>';
+    winEl.classList.add('show');
+    startConfetti();
   }
 
-  function showResult() {
-    var corrects = G.log.filter(function(l){ return l.result === 'correct'; });
-    var wrong3   = G.log.filter(function(l){ return l.result === 'wrong3'; });
-    var passes   = G.log.filter(function(l){ return l.result === 'pass'; });
-    var myRank   = LB.findIndex(function(e){ return e.emoji === G.emoji && e.score === G.score; }) + 1;
+  /* ── 기록 저장 ── */
+  function saveRecord(tries, elapsed){
+    records.push({tries:tries, elapsed:parseFloat(elapsed), date:new Date().toLocaleDateString('ko-KR')});
+    records.sort(function(a,b){ return a.tries-b.tries || a.elapsed-b.elapsed; });
+    if(records.length>5) records=records.slice(0,5);
+    try{ localStorage.setItem('nb_records', JSON.stringify(records)); }catch(e){}
+    renderRecords();
+  }
 
-    var html = '<div class="grbox">';
-    html += '<h2>🗺️ 결과 ' + (G.emoji || '') + '</h2>';
-    html += '<div class="grsub">1분 동안 <b>' + G.score + '점</b> 획득!</div>';
-    html += '<div class="grbadges">';
-    html += '<div class="grbadge bc"><div class="n">' + corrects.length + '</div><div class="l">✅ 정답</div></div>';
-    html += '<div class="grbadge bw"><div class="n">' + wrong3.length + '</div><div class="l">❌ 3번 틀림</div></div>';
-    html += '<div class="grbadge bp"><div class="n">' + passes.length + '</div><div class="l">⏭️ 패스</div></div>';
-    html += '</div>';
-    if (corrects.length) html += '<div class="grsec">✅ 맞춘 지역 (' + corrects.length + ')</div><div class="grtags">' + corrects.map(function(l){ return '<span class="gtag tc">' + l.name + '</span>'; }).join('') + '</div>';
-    if (wrong3.length)   html += '<div class="grsec">❌ 3번 틀린 지역 (' + wrong3.length + ')</div><div class="grtags">' + wrong3.map(function(l){ return '<span class="gtag tw">' + l.name + '</span>'; }).join('') + '</div>';
-    if (passes.length)   html += '<div class="grsec">⏭️ 패스한 지역 (' + passes.length + ')</div><div class="grtags">' + passes.map(function(l){ return '<span class="gtag tp">' + l.name + '</span>'; }).join('') + '</div>';
-    html += '<div class="grbtns"><button class="grbtn grbtn-go" onclick="window.doRetry()">다시 하기</button><button class="grbtn grbtn-cl" onclick="window.doClose()">지도로 돌아가기</button></div>';
-    html += '</div>';
+  function renderRecords(){
+    var el = document.getElementById('nb-records-list');
+    if(!records.length){ el.innerHTML='<span style="color:#999;font-size:11px;">아직 기록 없음</span>'; return; }
+    el.innerHTML = records.map(function(r,i){
+      return '<span class="nb-rec-chip">'+['🥇','🥈','🥉','4위','5위'][i]+' <b>'+r.tries+'번</b> '+r.elapsed+'s</span>';
+    }).join('');
+  }
 
-    html += '<div class="lbbox"><h3>🏆 이번 세션 순위표</h3>';
-    if (LB.length === 0) {
-      html += '<div class="lbmt">아직 기록이 없어요</div>';
-    } else {
-      LB.forEach(function(e, i) {
-        var cls = i===0?'r1':i===1?'r2':i===2?'r3':'';
-        var isNew = (e.emoji === G.emoji && e.score === G.score && i+1 === myRank);
-        html += '<div class="lbrow"><span class="lbrnk ' + cls + '">' + (i+1) + '</span><span class="lbem">' + e.emoji + '</span>' + (isNew ? '<span class="lbnew">NEW</span>' : '') + '<span class="lbsc">' + e.score + '점</span></div>';
+  /* ── 폭죽 ── */
+  var confParticles=[], confRunning=false, confAnimId=null;
+  var CONF_COLORS=['#2E7D5E','#4CAF50','#f57c00','#1976d2','#7b1fa2','#e53935','#fbc02d'];
+
+  function startConfetti(){
+    var box = document.getElementById('nb-box');
+    confCanvas.width = box.offsetWidth;
+    confCanvas.height = box.offsetHeight;
+    confParticles=[];
+    for(var i=0;i<120;i++){
+      confParticles.push({
+        x:Math.random()*confCanvas.width,
+        y:Math.random()*confCanvas.height*0.5,
+        vx:(Math.random()-0.5)*4,
+        vy:Math.random()*-6-2,
+        w:Math.random()*8+4,
+        h:Math.random()*4+2,
+        rot:Math.random()*360,
+        rspeed:(Math.random()-0.5)*8,
+        color:CONF_COLORS[Math.floor(Math.random()*CONF_COLORS.length)],
+        alpha:1,
+        gravity:0.15+Math.random()*0.1
       });
     }
-    html += '</div>';
-
-    var rs = document.getElementById('gresult');
-    rs.innerHTML = html;
-    rs.classList.add('on');
+    confRunning=true;
+    animConf();
   }
 
-  window.doRetry = function() {
-    document.getElementById('gresult').classList.remove('on');
-    var paths = document.querySelectorAll('path[data-sigungu]');
-    paths.forEach(function(p){ p.style.fill = ''; });
-    document.getElementById('game-overlay').classList.add('active');
-  };
+  function animConf(){
+    if(!confRunning) return;
+    confCtx.clearRect(0,0,confCanvas.width,confCanvas.height);
+    var alive=false;
+    confParticles.forEach(function(p){
+      p.x+=p.vx; p.y+=p.vy; p.vy+=p.gravity; p.rot+=p.rspeed;
+      if(p.y < confCanvas.height+10) alive=true;
+      if(p.y > confCanvas.height*0.8) p.alpha -= 0.025;
+      if(p.alpha<=0) return;
+      confCtx.save();
+      confCtx.globalAlpha=Math.max(0,p.alpha);
+      confCtx.translate(p.x,p.y); confCtx.rotate(p.rot*Math.PI/180);
+      confCtx.fillStyle=p.color;
+      confCtx.fillRect(-p.w/2,-p.h/2,p.w,p.h);
+      confCtx.restore();
+    });
+    if(alive) confAnimId=requestAnimationFrame(animConf);
+    else stopConfetti();
+  }
 
-  window.doClose = function() {
-    document.getElementById('gresult').classList.remove('on');
-    var paths = document.querySelectorAll('path[data-sigungu]');
-    paths.forEach(function(p){ p.style.fill = ''; });
-  };
+  function stopConfetti(){
+    confRunning=false;
+    if(confAnimId) cancelAnimationFrame(confAnimId);
+    confCtx.clearRect(0,0,confCanvas.width,confCanvas.height);
+  }
 
-  function updatePassBtn() {
-    var b = document.getElementById('gpass-btn');
-    b.textContent = '⏭️ 패스 (' + G.passLeft + ')';
-    b.disabled = G.passLeft <= 0;
-  }
-  function updateWrong() {
-    var dots = ['○','○','○'].map(function(_,i){ return i < G.wrongCnt ? '●' : '○'; }).join('');
-    var el = document.getElementById('gwrong');
-    el.textContent = dots;
-    el.style.color = G.wrongCnt >= 3 ? '#ff5252' : G.wrongCnt >= 2 ? '#ff9800' : '#fff';
-  }
-  function showFB(text, color) {
-    var fb = document.getElementById('gfb');
-    fb.textContent = text; fb.style.color = color; fb.style.display = 'block';
-    fb.style.animation = 'none';
-    requestAnimationFrame(function(){ fb.style.animation = 'gbounce .6s ease forwards'; });
-    setTimeout(function(){ fb.style.display = 'none'; }, 600);
-  }
-  function showHintPop(text) {
-    var p = document.getElementById('ghint-pop');
-    p.textContent = text; p.style.display = 'block';
-  }
-  function hideHintPop() {
-    document.getElementById('ghint-pop').style.display = 'none';
-  }
+  renderRecords();
 })();
 </script>
 </body>
