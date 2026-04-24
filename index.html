@@ -83,7 +83,7 @@
 </head>
 <body>
 <header style="background:#2E7D5E; color:#fff; padding:10px; font-size:18px; display:flex; justify-content:space-between; align-items:center; flex-shrink:0;">
-  <span>우리나라 지도 색칠하기 & 점찍기 🎗️🗺️🖌️🍺🍗🤪 v2.0 20260422</span>
+  <span>우리나라 지도 색칠하기 & 점찍기 ㄴㄴㄴ🎗️🗺️🖌️🍺🍗🤪 v2.0 20260422</span>
   <div id="iconLinks" style="display:flex; gap:12px; align-items:center;">
     <span id="egg-trigger" style="cursor:pointer;font-size:18px;" title="">🐤</span>
     <a href="https://buymeacoffee.com/geotasoo" target="_blank" data-tip="커피보내기" style="color:#fff; font-size:18px; text-decoration:none;">☕</a>
@@ -204,7 +204,16 @@ const $=id=>document.getElementById(id);
 document.querySelector('header span').addEventListener('click',()=>$('btn-reset').click());
 
 const tooltipDiv=$('map-custom-tooltip');
-function showTT(h,e){tooltipDiv.innerHTML=h;tooltipDiv.classList.add('visible');tooltipDiv.style.left=(e.originalEvent.clientX+15)+'px';tooltipDiv.style.top=(e.originalEvent.clientY+8)+'px';}
+function showTT(h,e){
+  // Fix typo: 군사 → 군산
+  let displayName = h.replace(/군사(시)?$/, '군산');
+  // Remove 시/군/구 suffix for tooltip display
+  displayName = displayName.replace(/(시|군|구)$/, '');
+  tooltipDiv.innerHTML=displayName;
+  tooltipDiv.classList.add('visible');
+  tooltipDiv.style.left=(e.originalEvent.clientX+15)+'px';
+  tooltipDiv.style.top=(e.originalEvent.clientY+8)+'px';
+}
 function hideTT(){tooltipDiv.classList.remove('visible');}
 
 const map=L.map('map',{center:[36.5,127.8],zoom:6.5,zoomSnap:0,zoomDelta:0.1,zoomControl:false,attributionControl:false});
@@ -367,7 +376,11 @@ Promise.all([
 
   function createSgLayer(f){
     const layer = L.geoJSON(sgJson,{filter:f,style:getSgStyle,onEachFeature:(ft,ly)=>{
-      ly.on('click',()=>{if(dotMode)return;if(sgVisible){toggleSgLayerColor(ly);sdBorderLayer.bringToFront();}});
+      ly.on('click',()=>{
+        if(dotMode)return;
+        if(window.GAME_ACTIVE)return; // Don't allow color toggling during game
+        if(sgVisible){toggleSgLayerColor(ly);sdBorderLayer.bringToFront();}
+      });
       if(ft.properties?.NL_NAME_2){
         const n=ft.properties.NL_NAME_2;
         ly.on('mouseover',e=>{if(!window.GAME_ACTIVE)showTT(n,e);});
@@ -930,7 +943,23 @@ Promise.all([
     document.getElementById('gtimer').textContent = G.timer;
     document.getElementById('ghint-btn').disabled = true;
     if (adj && adj.length) {
-      showHintPop('💡 주변 지역: ' + adj.join(', '));
+      // Filter out 도 units (경기도, 강원도 etc) but keep special cities
+      var filtered = adj.filter(function(name) {
+        // Keep: 특별시, 광역시, 특별자치시
+        if (name.indexOf('특별시') >= 0 || name.indexOf('광역시') >= 0 || name.indexOf('특별자치시') >= 0) {
+          return true;
+        }
+        // Remove: 경기도, 강원도 etc (ends with just '도')
+        if (name.match(/[가-힣]+도$/)) {
+          return false;
+        }
+        return true;
+      });
+      if (filtered.length > 0) {
+        showHintPop('💡 주변 지역: ' + filtered.join(', '));
+      } else {
+        showHintPop('💡 주변 지역 정보 없음');
+      }
     } else {
       showHintPop('💡 주변 지역 정보 없음');
     }
