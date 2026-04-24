@@ -78,12 +78,6 @@
     .leaflet-interactive:focus { outline:none !important; }
     .map-custom-tooltip { position:fixed; pointer-events:none; background:rgba(255,255,255,0.97); border:1.5px solid #333; border-radius:6px; padding:5px 16px; font-size:17px; color:#222; white-space:nowrap; box-shadow:2px 4px 12px rgba(0,0,0,0.09); z-index:9999; opacity:0; }
     .map-custom-tooltip.visible { opacity:1; }
-    
-    /* 게임 색상 클래스 */
-    .gcor { fill:#66bb6a !important; }
-    .gwfl { fill:#ef5350 !important; }
-    .gpas { fill:#ffa726 !important; }
-    
     @media (max-width:700px) { header{font-size:15px; padding:8px;} #toolbar{gap:8px; padding:6px; font-size:0.95em;} .side-panel.open{width:180px; min-width:180px;} }
   </style>
 </head>
@@ -210,16 +204,7 @@ const $=id=>document.getElementById(id);
 document.querySelector('header span').addEventListener('click',()=>$('btn-reset').click());
 
 const tooltipDiv=$('map-custom-tooltip');
-function showTT(h,e){
-  // Fix typo: 군사 → 군산
-  let displayName = h.replace(/군사(시)?$/, '군산');
-  // Remove 시/군/구 suffix for tooltip display
-  displayName = displayName.replace(/(시|군|구)$/, '');
-  tooltipDiv.innerHTML=displayName;
-  tooltipDiv.classList.add('visible');
-  tooltipDiv.style.left=(e.originalEvent.clientX+15)+'px';
-  tooltipDiv.style.top=(e.originalEvent.clientY+8)+'px';
-}
+function showTT(h,e){tooltipDiv.innerHTML=h;tooltipDiv.classList.add('visible');tooltipDiv.style.left=(e.originalEvent.clientX+15)+'px';tooltipDiv.style.top=(e.originalEvent.clientY+8)+'px';}
 function hideTT(){tooltipDiv.classList.remove('visible');}
 
 const map=L.map('map',{center:[36.5,127.8],zoom:6.5,zoomSnap:0,zoomDelta:0.1,zoomControl:false,attributionControl:false});
@@ -353,11 +338,6 @@ Promise.all([
   fetch('202604_sk.geojson').then(r=>r.json())
 ]).then(([sdJson,sgJson,nkJson,skJson])=>{
 
-  // Initialize game REGIONS from GeoJSON
-  if (typeof initializeRegions === 'function') {
-    initializeRegions(sgJson);
-  }
-
   nkLayer = L.geoJSON(nkJson,{
     style: ()=>({color:'#333', weight:parseFloat($('slider-nk').value), fillColor:'#ffffff', fillOpacity:defaultLandOpacity, opacity:1}),
     onEachFeature:(ft,ly)=>{
@@ -385,27 +365,11 @@ Promise.all([
     if(ft.properties?.NL_NAME_1){const n=ft.properties.NL_NAME_1;ly.on('mouseover',e=>showTT(n,e));ly.on('mousemove',e=>showTT(n,e));ly.on('mouseout',hideTT);}
   }});}
 
-  function createSgLayer(f){
-    const layer = L.geoJSON(sgJson,{filter:f,style:getSgStyle,onEachFeature:(ft,ly)=>{
-      ly.on('click',()=>{
-        if(dotMode)return;
-        if(window.GAME_ACTIVE)return; // Don't allow color toggling during game
-        if(sgVisible){toggleSgLayerColor(ly);sdBorderLayer.bringToFront();}
-      });
-      if(ft.properties?.NL_NAME_2){
-        const n=ft.properties.NL_NAME_2;
-        ly.on('mouseover',e=>{if(!window.GAME_ACTIVE)showTT(n,e);});
-        ly.on('mousemove',e=>{if(!window.GAME_ACTIVE)showTT(n,e);});
-        ly.on('mouseout',hideTT);
-        // Add data-sigungu after layer is created
-        ly.on('add', function() {
-          const el = ly.getElement();
-          if(el) el.setAttribute('data-sigungu', n);
-        });
-      }
-    }});
-    return layer;
-  }
+  function createSgLayer(f){return L.geoJSON(sgJson,{filter:f,style:getSgStyle,onEachFeature:(ft,ly)=>{
+    if(ft.properties?.NL_NAME_2) ly.getElement().setAttribute('data-sigungu', ft.properties.NL_NAME_2);
+    ly.on('click',()=>{if(dotMode)return;if(sgVisible){toggleSgLayerColor(ly);sdBorderLayer.bringToFront();}});
+    if(ft.properties?.NL_NAME_2){const n=ft.properties.NL_NAME_2;ly.on('mouseover',e=>showTT(n,e));ly.on('mousemove',e=>showTT(n,e));ly.on('mouseout',hideTT);}
+  }});}
 
   function updateLayers(){
     if(sdLayer)map.removeLayer(sdLayer);
@@ -497,8 +461,9 @@ Promise.all([
 .eopt{font-size:24px;background:#f5f5f5;border:2px solid transparent;border-radius:8px;padding:4px 7px;cursor:pointer;transition:all .15s;line-height:1.3;}
 .eopt:hover{background:#e8f5e9;transform:scale(1.1);}
 .eopt.sel{border-color:#2E7D5E;background:#e8f5e9;}
-#gbtn{background:#0F6E56;color:#fff;border:none;border-radius:8px;padding:12px 36px;font-size:16px;cursor:pointer;font-weight:bold;transition:background .2s;}
-#gbtn:hover{background:#0a5240;}
+#gbtn{background:#2E7D5E;color:#fff;border:none;border-radius:8px;padding:12px 36px;font-size:16px;cursor:pointer;font-weight:bold;opacity:.4;transition:opacity .2s;}
+#gbtn.rdy{opacity:1;}
+#gbtn.rdy:hover{background:#256b4e;}
 #ghud{display:none;position:fixed;top:0;left:0;right:0;z-index:5500;background:rgba(46,125,94,.96);color:#fff;height:76px;padding:0 20px;box-shadow:0 2px 10px rgba(0,0,0,.3);}
 #ghud.on{display:grid;grid-template-columns:180px 1fr 240px;align-items:center;}
 .hl{display:flex;gap:18px;}
@@ -565,18 +530,14 @@ Promise.all([
     <h2>🗺️ 지역 찾기</h2>
     <div class="grules">
       <b>📌 게임 방법</b><br>
-      • 1분 안에 시군 이름을 보고 지도에서 찾아 클릭!<br>
+      • 1분 안에 시군구 이름을 보고 지도에서 찾아 클릭!<br>
       • 3번 틀리면 자동으로 다음 지역으로 넘어가요<br>
       • 패스 3회 사용 가능<br>
-      • <b>💡 힌트</b>: 어느 도(道)인지 알려줌 (단, <b>-1초</b> 패널티!)
+      • <b>💡 힌트</b>: 주변 지역 표시 (단, <b>-1초</b> 패널티!)
     </div>
-    <div style="background:#ffebee;border:1px solid #ef5350;border-radius:8px;padding:10px 14px;margin:12px 0;font-size:12px;color:#c62828;line-height:1.6;">
-      <b>⚠️ 주의:</b> 게임 종료 후 지도로 돌아올 때 모든 색칠과 점이 초기화됩니다!
-    </div>
-    <div style="display:flex;gap:10px;justify-content:center;margin-top:16px;">
-      <button id="gbtn" style="background:#0F6E56;color:#fff;border:none;border-radius:8px;padding:12px 32px;font-size:16px;cursor:pointer;font-weight:bold;">🎮 시작!</button>
-      <button id="gcancel-btn" style="background:#eee;color:#333;border:none;border-radius:8px;padding:12px 32px;font-size:16px;cursor:pointer;font-weight:bold;">나가기</button>
-    </div>
+    <div class="epick-title">🍽️ 나의 음식 아이콘을 골라주세요</div>
+    <div class="egrid" id="egrid"></div>
+    <button id="gbtn" disabled>이모지를 선택하세요</button>
   </div>
 </div>
 
@@ -607,11 +568,187 @@ Promise.all([
 (function() {
   var FOOD_EMOJIS = ['🍕','🍔','🍜','🍣','🌮','🍩','🍦','🍗','🥗','🍱','🥐','🍛','🧆','🥩','🍤','🍙','🥘','🍝','🥪','🫕','🍢','🍖','🥟','🫔'];
 
-  // Make these globally accessible for the main script
-  window.REGIONS = {}; // Will be populated from GeoJSON
-  window.DIFF = {};
-  var REGIONS = window.REGIONS;
-  var DIFF = window.DIFF;
+  var REGIONS = {
+    "서울특별시":{adjacent:["인천광역시","경기도"]},
+    "부산광역시":{adjacent:["울산광역시","경상남도","김해시","양산시"]},
+    "대구광역시":{adjacent:["경상북도","경산시","청도군","고령군"]},
+    "인천광역시":{adjacent:["서울특별시","경기도","김포시","부천시"]},
+    "광주광역시":{adjacent:["전라남도","화순군","담양군","장성군"]},
+    "대전광역시":{adjacent:["세종특별자치시","충청남도","충청북도","금산군","청주시","공주시"]},
+    "울산광역시":{adjacent:["부산광역시","경상남도","경상북도","양산시","경주시"]},
+    "세종특별자치시":{adjacent:["대전광역시","충청남도","충청북도","공주시","청주시"]},
+    "수원시":{adjacent:["용인시","화성시","의왕시","군포시","안산시"]},
+    "성남시":{adjacent:["서울특별시","광주시","하남시","용인시"]},
+    "고양시":{adjacent:["서울특별시","파주시","양주시","의정부시"]},
+    "용인시":{adjacent:["수원시","성남시","안성시","평택시","화성시"]},
+    "부천시":{adjacent:["서울특별시","인천광역시","김포시","시흥시"]},
+    "안산시":{adjacent:["수원시","시흥시","화성시","군포시"]},
+    "안양시":{adjacent:["서울특별시","과천시","군포시","의왕시"]},
+    "남양주시":{adjacent:["서울특별시","구리시","하남시","양평군","가평군"]},
+    "화성시":{adjacent:["수원시","안산시","평택시","오산시","용인시"]},
+    "평택시":{adjacent:["화성시","안성시","아산시","당진시"]},
+    "의정부시":{adjacent:["서울특별시","양주시","동두천시","포천시"]},
+    "시흥시":{adjacent:["안산시","부천시","광명시","안양시"]},
+    "파주시":{adjacent:["고양시","연천군","김포시"]},
+    "김포시":{adjacent:["서울특별시","인천광역시","부천시","고양시","파주시"]},
+    "광명시":{adjacent:["서울특별시","부천시","시흥시"]},
+    "광주시":{adjacent:["성남시","하남시","양평군","여주시"]},
+    "군포시":{adjacent:["수원시","안양시","안산시","의왕시"]},
+    "이천시":{adjacent:["광주시","여주시","안성시","충청북도"]},
+    "양주시":{adjacent:["의정부시","동두천시","포천시","연천군"]},
+    "오산시":{adjacent:["수원시","화성시","평택시"]},
+    "구리시":{adjacent:["서울특별시","남양주시"]},
+    "안성시":{adjacent:["용인시","이천시","평택시","충청북도"]},
+    "포천시":{adjacent:["의정부시","양주시","가평군","강원특별자치도"]},
+    "의왕시":{adjacent:["수원시","안양시","군포시","과천시"]},
+    "하남시":{adjacent:["서울특별시","성남시","광주시","남양주시"]},
+    "여주시":{adjacent:["광주시","이천시","양평군","충청북도"]},
+    "동두천시":{adjacent:["의정부시","양주시","연천군"]},
+    "과천시":{adjacent:["서울특별시","안양시","의왕시"]},
+    "가평군":{adjacent:["남양주시","포천시","양평군","강원특별자치도"]},
+    "양평군":{adjacent:["남양주시","광주시","여주시","가평군","강원특별자치도"]},
+    "연천군":{adjacent:["파주시","동두천시","양주시","포천시"]},
+    
+    "춘천시":{adjacent:["홍천군","화천군","양구군","인제군"]},
+    "원주시":{adjacent:["횡성군","영월군","평창군","충청북도"]},
+    "강릉시":{adjacent:["평창군","정선군","동해시","양양군"]},
+    "동해시":{adjacent:["강릉시","삼척시"]},
+    "태백시":{adjacent:["삼척시","정선군","경상북도"]},
+    "속초시":{adjacent:["양양군","고성군","인제군"]},
+    "삼척시":{adjacent:["동해시","태백시","경상북도"]},
+    "홍천군":{adjacent:["춘천시","횡성군","인제군","평창군"]},
+    "횡성군":{adjacent:["원주시","홍천군","평창군"]},
+    "영월군":{adjacent:["원주시","평창군","정선군","경상북도","충청북도"]},
+    "평창군":{adjacent:["원주시","강릉시","홍천군","영월군","정선군"]},
+    "정선군":{adjacent:["강릉시","태백시","영월군","평창군"]},
+    "철원군":{adjacent:["화천군","김화군"]},
+    "화천군":{adjacent:["춘천시","철원군","양구군","인제군"]},
+    "양구군":{adjacent:["춘천시","화천군","인제군"]},
+    "인제군":{adjacent:["춘천시","속초시","홍천군","화천군","양구군","고성군","양양군"]},
+    "고성군":{adjacent:["속초시","인제군","양양군"]},
+    "양양군":{adjacent:["강릉시","속초시","인제군","고성군"]},
+
+    "청주시":{adjacent:["대전광역시","세종특별자치시","보은군","옥천군","진천군","증평군"]},
+    "충주시":{adjacent:["제천시","음성군","괴산군","경상북도"]},
+    "제천시":{adjacent:["충주시","단양군","경상북도","강원특별자치도"]},
+    "보은군":{adjacent:["청주시","옥천군","괴산군","경상북도"]},
+    "옥천군":{adjacent:["청주시","보은군","영동군","전라북도"]},
+    "영동군":{adjacent:["옥천군","전라북도","경상북도"]},
+    "증평군":{adjacent:["청주시","괴산군","진천군"]},
+    "진천군":{adjacent:["청주시","증평군","음성군","경기도"]},
+    "괴산군":{adjacent:["청주시","충주시","보은군","증평군"]},
+    "음성군":{adjacent:["충주시","진천군","경기도"]},
+    "단양군":{adjacent:["제천시","경상북도","강원특별자치도"]},
+
+    "천안시":{adjacent:["아산시","세종특별자치시","공주시","청주시"]},
+    "공주시":{adjacent:["대전광역시","세종특별자치시","천안시","논산시","부여군"]},
+    "보령시":{adjacent:["서천군","청양군","홍성군"]},
+    "아산시":{adjacent:["천안시","평택시","당진시","예산군"]},
+    "서산시":{adjacent:["당진시","태안군","홍성군"]},
+    "논산시":{adjacent:["대전광역시","공주시","부여군","전라북도"]},
+    "계룡시":{adjacent:["대전광역시","공주시","논산시"]},
+    "당진시":{adjacent:["아산시","서산시","평택시"]},
+    "금산군":{adjacent:["대전광역시","전라북도","충청북도"]},
+    "부여군":{adjacent:["공주시","논산시","서천군","청양군"]},
+    "서천군":{adjacent:["보령시","부여군","전라북도"]},
+    "청양군":{adjacent:["보령시","부여군","공주시","홍성군"]},
+    "홍성군":{adjacent:["보령시","청양군","서산시","예산군"]},
+    "예산군":{adjacent:["아산시","홍성군","당진시"]},
+    "태안군":{adjacent:["서산시"]},
+
+    "전주시":{adjacent:["익산시","완주군","진안군","김제시"]},
+    "군산시":{adjacent:["익산시","김제시","부안군"]},
+    "익산시":{adjacent:["전주시","군산시","김제시","완주군"]},
+    "정읍시":{adjacent:["김제시","부안군","고창군","순창군","전라남도"]},
+    "남원시":{adjacent:["완주군","임실군","순창군","경상남도"]},
+    "김제시":{adjacent:["전주시","군산시","익산시","정읍시","부안군"]},
+    "완주군":{adjacent:["전주시","익산시","남원시","진안군","임실군"]},
+    "진안군":{adjacent:["전주시","완주군","무주군","장수군","충청남도"]},
+    "무주군":{adjacent:["진안군","장수군","경상북도","충청북도"]},
+    "장수군":{adjacent:["진안군","무주군","임실군","경상남도","경상북도"]},
+    "임실군":{adjacent:["완주군","남원시","장수군","순창군"]},
+    "순창군":{adjacent:["정읍시","남원시","임실군","전라남도"]},
+    "고창군":{adjacent:["정읍시","부안군","전라남도"]},
+    "부안군":{adjacent:["군산시","김제시","정읍시","고창군"]},
+
+    "목포시":{adjacent:["무안군","신안군","영암군"]},
+    "여수시":{adjacent:["순천시","광양시","고흥군"]},
+    "순천시":{adjacent:["여수시","광양시","구례군","고흥군","보성군"]},
+    "나주시":{adjacent:["광주광역시","화순군","영암군","무안군","함평군"]},
+    "광양시":{adjacent:["여수시","순천시","구례군","경상남도"]},
+    "담양군":{adjacent:["광주광역시","곡성군","전라북도"]},
+    "곡성군":{adjacent:["담양군","순천군","구례군","전라북도"]},
+    "구례군":{adjacent:["순천시","광양시","곡성군","경상남도"]},
+    "고흥군":{adjacent:["여수시","순천시","보성군"]},
+    "보성군":{adjacent:["순천시","고흥군","화순군","장흥군"]},
+    "화순군":{adjacent:["광주광역시","나주시","보성군","순천군","담양군"]},
+    "장흥군":{adjacent:["보성군","강진군","영암군"]},
+    "강진군":{adjacent:["장흥군","영암군","해남군"]},
+    "해남군":{adjacent:["강진군","영암군","완도군","진도군"]},
+    "영암군":{adjacent:["목포시","나주시","장흥군","강진군","해남군","무안군"]},
+    "무안군":{adjacent:["목포시","나주시","영암군","함평군","신안군"]},
+    "함평군":{adjacent:["나주시","무안군","영광군","장성군"]},
+    "영광군":{adjacent:["함평군","장성군","전라북도"]},
+    "장성군":{adjacent:["광주광역시","함평군","영광군","담양군","전라북도"]},
+    "완도군":{adjacent:["해남군","진도군"]},
+    "진도군":{adjacent:["해남군","완도군"]},
+    "신안군":{adjacent:["목포시","무안군"]},
+
+    "포항시":{adjacent:["경주시","영덕군","청송군","영천시"]},
+    "경주시":{adjacent:["울산광역시","포항시","영천시","청도군"]},
+    "김천시":{adjacent:["구미시","성주군","전라북도","충청북도"]},
+    "안동시":{adjacent:["영주시","봉화군","의성군","청송군"]},
+    "구미시":{adjacent:["김천시","칠곡군","군위군","성주군"]},
+    "영주시":{adjacent:["안동시","봉화군","예천군","충청북도","강원특별자치도"]},
+    "영천시":{adjacent:["포항시","경주시","청도군","경산시"]},
+    "상주시":{adjacent:["문경시","예천군","의성군","충청북도"]},
+    "문경시":{adjacent:["상주시","예천군","충청북도"]},
+    "경산시":{adjacent:["대구광역시","영천시","청도군","자인군"]},
+    "의성군":{adjacent:["안동시","상주시","군위군","청송군"]},
+    "청송군":{adjacent:["포항시","안동시","의성군","영덕군"]},
+    "영양군":{adjacent:["안동시","봉화군","영덕군"]},
+    "영덕군":{adjacent:["포항시","청송군","영양군"]},
+    "청도군":{adjacent:["경주시","영천시","경산시","밀양시"]},
+    "고령군":{adjacent:["대구광역시","구미시","성주군","합천군"]},
+    "성주군":{adjacent:["김천시","구미시","고령군","칠곡군"]},
+    "칠곡군":{adjacent:["대구광역시","구미시","성주군","군위군"]},
+    "예천군":{adjacent:["영주시","상주시","문경시","의성군"]},
+    "봉화군":{adjacent:["안동시","영주시","영양군","강원특별자치도"]},
+    "울진군":{adjacent:["봉화군","강원특별자치도"]},
+    "울릉군":{adjacent:[]},
+    "군위군":{adjacent:["구미시","칠곡군","의성군"]},
+
+    "창원시":{adjacent:["진주시","김해시","함안군","의령군"]},
+    "진주시":{adjacent:["창원시","사천시","산청군","의령군","함안군"]},
+    "통영시":{adjacent:["거제시","고성군","사천시"]},
+    "사천시":{adjacent:["진주시","통영시","남해군","하동군"]},
+    "김해시":{adjacent:["부산광역시","창원시","양산시","밀양시"]},
+    "밀양시":{adjacent:["김해시","창녕군","청도군","양산시"]},
+    "거제시":{adjacent:["통영시"]},
+    "양산시":{adjacent:["부산광역시","울산광역시","김해시","밀양시"]},
+    "의령군":{adjacent:["창원시","진주시","함안군","합천군"]},
+    "함안군":{adjacent:["창원시","진주시","의령군","창녕군"]},
+    "창녕군":{adjacent:["밀양시","함안군","영산군","고령군"]},
+    "고성군":{adjacent:["통영시","사천시","하동군"]},
+    "남해군":{adjacent:["사천시","하동군"]},
+    "하동군":{adjacent:["사천시","고성군","남해군","산청군","전라남도"]},
+    "산청군":{adjacent:["진주시","하동군","함양군","거창군","전라북도"]},
+    "함양군":{adjacent:["산청군","거창군","전라북도"]},
+    "거창군":{adjacent:["산청군","함양군","합천군","전라북도","경상북도"]},
+    "합천군":{adjacent:["의령군","거창군","고령군","대구광역시"]},
+
+    "제주시":{adjacent:["서귀포시"]},
+    "서귀포시":{adjacent:["제주시"]},
+  };
+
+  var DIFF = {};
+  Object.keys(REGIONS).forEach(function(r) {
+    var adjCount = REGIONS[r].adjacent.length;
+    if (adjCount >= 5) DIFF[r] = 1;
+    else if (adjCount >= 2) DIFF[r] = 2;
+    else DIFF[r] = 3;
+  });
+
   var LB = [];
 
   var G = {
@@ -622,54 +759,35 @@ Promise.all([
     emoji: null, hintUsed: false
   };
 
-  // Build REGIONS from GeoJSON after map loads
-  window.initializeRegions = function(sgJson) {
-    sgJson.features.forEach(function(feature) {
-      var name = feature.properties.NL_NAME_2;
-      var province = feature.properties.NL_NAME_1; // 시도 (도/특별시/광역시)
-      if (name && !REGIONS[name]) {
-        REGIONS[name] = {
-          province: province // Store province for hint
-        };
-        DIFF[name] = name.length <= 3 ? 1 : name.length <= 4 ? 2 : 3;
-      }
-    });
-    console.log('REGIONS initialized:', Object.keys(REGIONS).length, 'regions');
-  };
-
   function getDiff(score) {
-    return 0; // Not used anymore
+    return score < 8 ? 1 : score < 15 ? 2 : 3;
   }
 
-  function buildQueue(dummy) {
+  function buildQueue(maxDiff) {
     var keys = Object.keys(REGIONS);
-    console.log('buildQueue: REGIONS has', keys.length, 'keys');
-    
-    if (keys.length === 0) {
-      console.error('ERROR: REGIONS is empty! Game cannot start.');
-      alert('지도 데이터를 로딩 중입니다. 잠시 후 다시 시도해주세요!');
-      return [];
-    }
-    
-    // Exclude 광역시/특별시/특별자치시 - only keep 시/군/구
-    var filteredKeys = keys.filter(function(r) {
-      return !r.match(/(광역시|특별시|특별자치시)$/);
-    });
-    console.log('After filtering out 광역시/특별시:', filteredKeys.length, 'regions');
-    
-    if (filteredKeys.length === 0) {
-      console.error('ERROR: No regions after filtering!');
-      return keys; // Return all if filter removed everything
-    }
-    
-    // Simple random shuffle
-    var queue = filteredKeys.sort(function(){ return Math.random() - 0.5; });
-    console.log('Queue built, first 5:', queue.slice(0, 5));
-    return queue;
+    var validKeys = keys.filter(function(r){ return DIFF[r] <= maxDiff; });
+    return validKeys.sort(function(){ return Math.random() - 0.5; });
   }
 
   (function initGame() {
+    var grid = document.getElementById('egrid');
     var startBtn = document.getElementById('gbtn');
+    var selEmoji = null;
+
+    FOOD_EMOJIS.forEach(function(em) {
+      var b = document.createElement('div');
+      b.className = 'eopt';
+      b.textContent = em;
+      b.addEventListener('click', function() {
+        grid.querySelectorAll('.eopt').forEach(function(x){ x.classList.remove('sel'); });
+        b.classList.add('sel');
+        selEmoji = em;
+        startBtn.disabled = false;
+        startBtn.textContent = em + '  시작!';
+        startBtn.classList.add('rdy');
+      });
+      grid.appendChild(b);
+    });
 
     var eggBtn = document.getElementById('egg-trigger');
     if (eggBtn) {
@@ -680,17 +798,10 @@ Promise.all([
     }
 
     startBtn.addEventListener('click', function() {
+      if (!selEmoji) return;
       document.getElementById('game-overlay').classList.remove('active');
-      startGame(null); // No emoji needed
+      startGame(selEmoji);
     });
-
-    // Cancel button
-    var cancelBtn = document.getElementById('gcancel-btn');
-    if (cancelBtn) {
-      cancelBtn.addEventListener('click', function() {
-        document.getElementById('game-overlay').classList.remove('active');
-      });
-    }
 
     document.getElementById('gpass-btn').addEventListener('click', passQ);
     document.getElementById('ghint-btn').addEventListener('click', useHint);
@@ -698,70 +809,63 @@ Promise.all([
   })();
 
   function startGame(emoji) {
-    console.log('=== STARTING GAME ===');
-    window.GAME_ACTIVE = true;
     G.active = true; G.timer = 60; G.score = 0;
     G.passLeft = 3; G.wrongCnt = 0; G.log = [];
-    G.queue = buildQueue(); // No parameter needed
+    G.queue = buildQueue(getDiff(0));
     G.idx = 0; G.locked = false; G.emoji = emoji; G.hintUsed = false;
-    
-    console.log('Game initialized, queue length:', G.queue.length);
 
-    // HIDE TOOLBAR
     document.getElementById('toolbar').style.display = 'none';
     document.getElementById('ghud').classList.add('on');
 
-    // ========== COMPLETE RESET FOR GAME ==========
-    
-    console.log('Clearing colors...');
-    
-    // 1. Clear ALL colors - Leaflet layers and game classes
-    // Clear the color map (only sgLayer needed for game)
-    if (typeof coloredSg !== 'undefined') {
-      coloredSg.clear();
-    }
-    
-    // Reset all sgLayer styles
-    if (typeof sgLayer !== 'undefined' && sgLayer) {
-      sgLayer.eachLayer(function(layer) {
-        layer.setStyle({fillColor: '#ffffff', fillOpacity: 0});
+    // ========== GAME RESET ==========
+    // Clear all path colors safely
+    try {
+      var paths = document.querySelectorAll('path[data-sigungu]');
+      paths.forEach(function(p){ 
+        p.style.fill = ''; 
+        p.classList.remove('gcor', 'gwfl', 'gpas');
       });
+      
+      // Clear coloredSg map if exists
+      if (typeof coloredSg !== 'undefined') {
+        coloredSg.clear();
+      }
+      
+      // Reset sgLayer styles
+      if (typeof sgLayer !== 'undefined' && sgLayer) {
+        sgLayer.eachLayer(function(layer) {
+          layer.setStyle({fillColor: '#ffffff', fillOpacity: 0});
+        });
+      }
+      
+      // Clear dots
+      if (typeof dotMarkers !== 'undefined') {
+        dotMarkers.forEach(function(m) { 
+          if (typeof map !== 'undefined' && map.removeLayer) map.removeLayer(m); 
+        });
+        dotMarkers.length = 0;
+      }
+      if (typeof selectedCities !== 'undefined') selectedCities.clear();
+      if (typeof manualPins !== 'undefined') manualPins.length = 0;
+      
+      // Hide panels
+      var cityPanel = document.getElementById('city-panel');
+      var pinPanel = document.getElementById('pin-panel');
+      if (cityPanel) cityPanel.classList.remove('open');
+      if (pinPanel) pinPanel.classList.remove('open');
+      
+      // Hide NK/SK borders
+      if (typeof nkVisible !== 'undefined' && nkVisible && typeof nkLayer !== 'undefined' && nkLayer) {
+        map.removeLayer(nkLayer);
+        nkVisible = false;
+      }
+      if (typeof skLayer !== 'undefined' && skLayer) {
+        try { map.removeLayer(skLayer); } catch(e) {}
+      }
+    } catch(e) {
+      console.warn('Some reset operations failed:', e);
     }
-    
-    // Force clear all path elements
-    var allPaths = document.querySelectorAll('path[data-sigungu], path.sigungu, svg path');
-    console.log('Found', allPaths.length, 'paths to clear');
-    allPaths.forEach(function(p){ 
-      p.style.fill = ''; 
-      p.style.fillOpacity = '';
-      p.classList.remove('gcor', 'gwfl', 'gpas');
-    });
-
-    // 2. Hide NK/SK borders
-    if (typeof nkVisible !== 'undefined' && nkVisible && typeof nkLayer !== 'undefined' && nkLayer) {
-      map.removeLayer(nkLayer);
-      nkVisible = false;
-    }
-    if (typeof skLayer !== 'undefined' && skLayer) {
-      map.removeLayer(skLayer);
-    }
-
-    // 3. Clear all dots and pins
-    if (typeof dotMarkers !== 'undefined') {
-      dotMarkers.forEach(function(m) { 
-        if (map && map.removeLayer) map.removeLayer(m);
-      });
-      dotMarkers = [];
-    }
-    if (typeof selectedCities !== 'undefined') {
-      selectedCities.clear();
-    }
-    if (typeof manualPins !== 'undefined') {
-      manualPins = [];
-    }
-
-    // 4. Reset zoom - skip for now (map not in scope)
-    // map.setView([36.5, 127.5], 7);
+    // ========== END RESET ==========
 
     updatePassBtn(); updateWrong();
     nextQ();
@@ -779,17 +883,16 @@ Promise.all([
   }
 
   function nextQ() {
-    if (G.idx >= G.queue.length) {
-      // No more questions - shouldn't happen in 60 seconds
-      endGame();
-      return;
+    var newDiff = getDiff(G.score);
+    var curDiff = getDiff(Math.max(0, G.score - 1));
+    if (newDiff > curDiff || G.idx >= G.queue.length) {
+      G.queue = buildQueue(newDiff);
+      G.idx = 0;
     }
     G.wrongCnt = 0; G.hintUsed = false;
     updateWrong();
     document.getElementById('ghint-btn').disabled = false;
-    var currentQuestion = G.queue[G.idx];
-    console.log('nextQ: showing question', G.idx, ':', currentQuestion);
-    document.getElementById('gq').textContent = currentQuestion || '???';
+    document.getElementById('gq').textContent = G.queue[G.idx];
     document.getElementById('gscore').textContent = G.score;
     hideHintPop();
   }
@@ -808,39 +911,24 @@ Promise.all([
 
       var correct = G.queue[G.idx];
       if (clicked === correct) {
-        // Correct answer - green
         G.score++; G.log.push({name:correct, result:'correct'});
-        var correctPaths = document.querySelectorAll('path[data-sigungu="' + clicked + '"]');
-        correctPaths.forEach(function(p){ 
-          p.style.fill = ''; // Clear inline style first
-          p.classList.add('gcor'); 
-        });
+        colorRegion(clicked, '#66bb6a');
         showFB('⭕', '#4caf50');
         G.idx++;
         document.getElementById('gscore').textContent = G.score;
         setTimeout(nextQ, 350);
       } else {
-        // Wrong answer - red, then clear
         G.wrongCnt++;
-        var wrongPaths = document.querySelectorAll('path[data-sigungu="' + clicked + '"]');
-        wrongPaths.forEach(function(p){ 
-          p.style.fill = ''; // Clear inline style first
-          p.classList.add('gwfl'); 
-        });
+        colorRegion(clicked, '#ef5350');
         showFB('❌', '#ef5350');
         G.locked = true;
+        G.log.push({name:correct, result:'wrong'});
         setTimeout(function() {
-          // Clear red color
-          wrongPaths.forEach(function(p){ p.classList.remove('gwfl'); });
+          colorRegion(clicked, '');
           G.locked = false;
           if (G.wrongCnt >= 3) {
-            // 3 wrong - show answer in RED (not orange!)
             G.log.push({name:correct, result:'wrong3'});
-            var correctPaths = document.querySelectorAll('path[data-sigungu="' + correct + '"]');
-            correctPaths.forEach(function(p){ 
-              p.style.fill = ''; // Clear inline style first
-              p.classList.add('gwfl');  // RED for wrong3
-            });
+            colorRegion(correct, '#ffa726');
             G.idx++;
             setTimeout(nextQ, 300);
           }
@@ -854,7 +942,6 @@ Promise.all([
   }
 
   function colorRegion(name, color) {
-    // This function is kept for compatibility but not used in game anymore
     var paths = document.querySelectorAll('path[data-sigungu="' + name + '"]');
     paths.forEach(function(p) {
       if (color) p.style.fill = color;
@@ -866,12 +953,7 @@ Promise.all([
     if (G.passLeft <= 0 || !G.active) return;
     var r = G.queue[G.idx];
     G.log.push({name:r, result:'pass'});
-    // Show passed region in orange
-    var passPaths = document.querySelectorAll('path[data-sigungu="' + r + '"]');
-    passPaths.forEach(function(p){ 
-      p.style.fill = ''; // Clear inline style first
-      p.classList.add('gpas'); 
-    });
+    colorRegion(r, '#ffa726');
     G.passLeft--; G.idx++;
     updatePassBtn();
     nextQ();
@@ -880,21 +962,19 @@ Promise.all([
   function useHint() {
     if (!G.active || G.hintUsed) return;
     var r = G.queue[G.idx];
-    var province = REGIONS[r] && REGIONS[r].province;
+    var adj = REGIONS[r] && REGIONS[r].adjacent;
     G.hintUsed = true;
     G.timer = Math.max(1, G.timer - 1);
     document.getElementById('gtimer').textContent = G.timer;
     document.getElementById('ghint-btn').disabled = true;
-    
-    if (province) {
-      showHintPop('💡 힌트: ' + province + '에 있습니다');
+    if (adj && adj.length) {
+      showHintPop('💡 주변 지역: ' + adj.join(', '));
     } else {
-      showHintPop('💡 힌트 정보 없음');
+      showHintPop('💡 주변 지역 정보 없음');
     }
   }
 
   function exitGame() {
-    window.GAME_ACTIVE = false;
     clearInterval(G.intv);
     G.active = false;
     document.getElementById('ghud').classList.remove('on');
@@ -905,12 +985,11 @@ Promise.all([
       mapDiv.removeEventListener('click', gameClickHandler);
       gameClickHandler = null;
     }
-    // Complete reset - click reset button (reloads page)
+    // Complete reset by clicking reset button (reloads page)
     document.getElementById('btn-reset').click();
   }
 
   function endGame() {
-    window.GAME_ACTIVE = false;
     clearInterval(G.intv);
     G.active = false;
     document.getElementById('ghud').classList.remove('on');
