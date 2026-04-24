@@ -83,7 +83,7 @@
 </head>
 <body>
 <header style="background:#2E7D5E; color:#fff; padding:10px; font-size:18px; display:flex; justify-content:space-between; align-items:center; flex-shrink:0;">
-  <span>우리나라 지도 색칠하기 & 점찍기 🎗️🗺️🖌️🍺🍗🤪 v2.0 20260422</span>
+  <span>우리나라 지도 색칠하기 & 점찍기 🎗️🗺️🖌️🍺ㅇㅇㅇㅇㅇㅇ🍗🤪 v2.0 20260422</span>
   <div id="iconLinks" style="display:flex; gap:12px; align-items:center;">
     <span id="egg-trigger" style="cursor:pointer;font-size:18px;" title="">🐤</span>
     <a href="https://buymeacoffee.com/geotasoo" target="_blank" data-tip="커피보내기" style="color:#fff; font-size:18px; text-decoration:none;">☕</a>
@@ -817,56 +817,6 @@ Promise.all([
     document.getElementById('toolbar').style.display = 'none';
     document.getElementById('ghud').classList.add('on');
 
-    // ========== GAME RESET ==========
-    // Clear all path colors safely
-    try {
-      var paths = document.querySelectorAll('path[data-sigungu]');
-      paths.forEach(function(p){ 
-        p.style.fill = ''; 
-        p.classList.remove('gcor', 'gwfl', 'gpas');
-      });
-      
-      // Clear coloredSg map if exists
-      if (typeof coloredSg !== 'undefined') {
-        coloredSg.clear();
-      }
-      
-      // Reset sgLayer styles
-      if (typeof sgLayer !== 'undefined' && sgLayer) {
-        sgLayer.eachLayer(function(layer) {
-          layer.setStyle({fillColor: '#ffffff', fillOpacity: 0});
-        });
-      }
-      
-      // Clear dots
-      if (typeof dotMarkers !== 'undefined') {
-        dotMarkers.forEach(function(m) { 
-          if (typeof map !== 'undefined' && map.removeLayer) map.removeLayer(m); 
-        });
-        dotMarkers.length = 0;
-      }
-      if (typeof selectedCities !== 'undefined') selectedCities.clear();
-      if (typeof manualPins !== 'undefined') manualPins.length = 0;
-      
-      // Hide panels
-      var cityPanel = document.getElementById('city-panel');
-      var pinPanel = document.getElementById('pin-panel');
-      if (cityPanel) cityPanel.classList.remove('open');
-      if (pinPanel) pinPanel.classList.remove('open');
-      
-      // Hide NK/SK borders
-      if (typeof nkVisible !== 'undefined' && nkVisible && typeof nkLayer !== 'undefined' && nkLayer) {
-        map.removeLayer(nkLayer);
-        nkVisible = false;
-      }
-      if (typeof skLayer !== 'undefined' && skLayer) {
-        try { map.removeLayer(skLayer); } catch(e) {}
-      }
-    } catch(e) {
-      console.warn('Some reset operations failed:', e);
-    }
-    // ========== END RESET ==========
-
     updatePassBtn(); updateWrong();
     nextQ();
 
@@ -985,8 +935,8 @@ Promise.all([
       mapDiv.removeEventListener('click', gameClickHandler);
       gameClickHandler = null;
     }
-    // Complete reset by clicking reset button (reloads page)
-    document.getElementById('btn-reset').click();
+    var paths = document.querySelectorAll('path[data-sigungu]');
+    paths.forEach(function(p){ p.style.fill = ''; });
   }
 
   function endGame() {
