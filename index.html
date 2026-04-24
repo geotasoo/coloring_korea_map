@@ -197,8 +197,7 @@ const KOREA_CITIES=[
 const SIDO_ORDER=["특별·광역·특별자치시","도·특별자치도청","섬·산·고개","경기도","강원특별자치도","충청북도","충청남도","전북특별자치도","전라남도","경상북도","경상남도","제주특별자치도","북측"];
 
 let selectedCities=new Set(), dotMarkers=[], dotMode=false, sidoCollapsed=new Set(SIDO_ORDER), manualPins=[];
-let nkVisible=false; // 기본값: 북한 꺼짐
-// 경계 모드: 0=없애기, 1=나라, 2=시도, 3=시군 (기본: 3=시군)
+let nkVisible=false;
 const BORDER_MODES=['경계없음','남측','시도','시군'];
 let borderMode=3;
 const $=id=>document.getElementById(id);
@@ -226,12 +225,10 @@ $('dotStroke').addEventListener('change',renderDots);
 map.on('zoomend',()=>{ if(dotMarkers.length>0) renderDots(); });
 $('btn-base').addEventListener('click',()=>{baseOn=!baseOn;if(baseOn){map.addLayer(baseLayer);$('btn-base').textContent='🌝 배경지도';}else{map.removeLayer(baseLayer);$('btn-base').textContent='🌚 배경지도';}});
 
-// 패널
 function openPanels(){dotMode=true;$('city-panel').classList.add('open');$('pin-panel').classList.add('open');$('btn-dot-panel').textContent='✅ 점찍기 완료';$('btn-dot-panel').classList.add('active');map.getContainer().style.cursor='crosshair';buildDotList('');buildPinList();}
 function closePanels(){dotMode=false;$('city-panel').classList.remove('open');$('pin-panel').classList.remove('open');$('btn-dot-panel').textContent='📍 점찍기';$('btn-dot-panel').classList.remove('active');map.getContainer().style.cursor='';}
 $('btn-dot-panel').addEventListener('click',()=>{if(dotMode)closePanels();else openPanels();});
 
-// 북측 토글: ON/OFF + 화면 맞춤
 $('btn-nk').addEventListener('click',()=>{
   nkVisible=!nkVisible;
   const btn=$('btn-nk');
@@ -247,7 +244,6 @@ $('btn-nk').addEventListener('click',()=>{
   fitMapBounds();
 });
 
-// 화면 맞춤 함수
 function fitMapBounds(){
   const layers=[];
   if(borderMode===1 && skLayer) layers.push(skLayer);
@@ -315,9 +311,7 @@ function buildPinList(){
 function renderDots(){
   dotMarkers.forEach(m=>map.removeLayer(m));dotMarkers=[];
   const r=parseFloat($('dotSize').value),color=$('dotColor').value,stroke=$('dotStroke').checked;
-  // circle은 미터 단위 - 슬라이더 값을 미터로 변환 (1→3000m, 12→36000m)
   const radiusM = r * 3000;
-  // 현재 줌에서 반지름이 몇 픽셀인지 계산해서 테두리 비율 맞춤
   const c = map.getCenter();
   const p1 = map.latLngToContainerPoint(c);
   const p2 = map.latLngToContainerPoint(L.latLng(c.lat, c.lng + radiusM / (111320 * Math.cos(c.lat * Math.PI / 180))));
@@ -344,7 +338,6 @@ Promise.all([
   fetch('202604_sk.geojson').then(r=>r.json())
 ]).then(([sdJson,sgJson,nkJson,skJson])=>{
 
-  // 북한 레이어 (토글 가능, 색칠 가능) - 기본 숨김
   nkLayer = L.geoJSON(nkJson,{
     style: ()=>({color:'#333', weight:parseFloat($('slider-nk').value), fillColor:'#ffffff', fillOpacity:defaultLandOpacity, opacity:1}),
     onEachFeature:(ft,ly)=>{
@@ -356,9 +349,8 @@ Promise.all([
       });
       ly.on('mouseout',hideTT);
     }
-  }); // 기본 숨김 - addTo(map) 안 함
+  });
 
-  // 속성명: NL_NAME_1 (시도), NL_NAME_2 (시군)
   provinceNames=[...new Set(sdJson.features.map(f=>f.properties.NL_NAME_1))].sort();
   const pc=$('provinceCheckboxes');pc.innerHTML='';
   provinceNames.forEach(n=>{const l=document.createElement('label');l.innerHTML=`<input type="checkbox" value="${n}" checked> ${n}`;pc.appendChild(l);});
@@ -388,14 +380,11 @@ Promise.all([
     const sel=Array.from(selectedProvinces);
     const ff=sel.length===0?(f=>false):(f=>sel.includes(f.properties.NL_NAME_1));
 
-    // borderMode: 0=없애기, 1=나라(sd fill만), 2=시도(sd fill+border), 3=시군(sg)
     if(borderMode===0){
-      // 없애기: 아무것도 안 그림
       sdLayer=L.geoJSON({type:'FeatureCollection',features:[]}).addTo(map);
       sgLayer=L.geoJSON({type:'FeatureCollection',features:[]});
       sdBorderLayer=L.geoJSON({type:'FeatureCollection',features:[]}).addTo(map);
     } else if(borderMode===1){
-      // 나라: 남한 전체 윤곽(sk) + 나라 경계
       if(skLayer)map.removeLayer(skLayer);
       skLayer=L.geoJSON(skJson,{
         style:()=>({color:'#333',weight:parseFloat($('slider-nk').value),fillColor:'#ffffff',fillOpacity:defaultLandOpacity,opacity:1}),
@@ -405,14 +394,12 @@ Promise.all([
       sgLayer=L.geoJSON({type:'FeatureCollection',features:[]});
       sdBorderLayer=L.geoJSON({type:'FeatureCollection',features:[]}).addTo(map);
     } else if(borderMode===2){
-      // 시도: sd fill + 시도 경계
       sdLayer=createSdLayer(ff).addTo(map);
       sgLayer=L.geoJSON({type:'FeatureCollection',features:[]});
       sdBorderLayer=L.geoJSON(sdJson,{filter:ff,style:()=>({color:'#222',weight:parseFloat($('slider-sd').value),fillOpacity:0,opacity:1}),interactive:false}).addTo(map);
       sdLayer.setStyle({fillOpacity:defaultLandOpacity,opacity:1});
       sdBorderLayer.bringToFront();
     } else {
-      // 시군(3): sg + sd border
       sdLayer=createSdLayer(ff).addTo(map);
       sgLayer=createSgLayer(ff);
       sdBorderLayer=L.geoJSON(sdJson,{filter:ff,style:()=>({color:'#222',weight:parseFloat($('slider-sd').value),fillOpacity:0,opacity:1}),interactive:false}).addTo(map);
@@ -426,7 +413,6 @@ Promise.all([
   }
   updateLayers();
 
-  // 경계 버튼: 없애기 → 나라 → 시도 → 시군 순환
   function updateBorderBtn(){
     const btn=$('btn-sg');
     const labels=['경계없음 →','남측 →','시도 →','시군 →'];
@@ -459,12 +445,8 @@ Promise.all([
 });
 </script>
 
-<!-- 
-  ===== 이스터에그: 🗺️ 지역 찾기 게임 =====
-  
--->
+<!-- ===== 이스터에그: 🗺️ 지역 찾기 게임 ===== -->
 <style>
-/* ===== 게임 오버레이 ===== */
 #game-overlay{display:none;position:fixed;inset:0;z-index:5000;background:rgba(0,0,0,.72);align-items:center;justify-content:center;}
 #game-overlay.active{display:flex;}
 .gbox{background:#fff;border-radius:16px;padding:32px 38px;width:460px;max-width:94vw;max-height:90vh;overflow-y:auto;box-shadow:0 8px 40px rgba(0,0,0,.3);text-align:center;}
@@ -479,8 +461,6 @@ Promise.all([
 #gbtn{background:#2E7D5E;color:#fff;border:none;border-radius:8px;padding:12px 36px;font-size:16px;cursor:pointer;font-weight:bold;opacity:.4;transition:opacity .2s;}
 #gbtn.rdy{opacity:1;}
 #gbtn.rdy:hover{background:#256b4e;}
-
-/* ===== 게임 HUD ===== */
 #ghud{display:none;position:fixed;top:0;left:0;right:0;z-index:5500;background:rgba(46,125,94,.96);color:#fff;height:76px;padding:0 20px;box-shadow:0 2px 10px rgba(0,0,0,.3);}
 #ghud.on{display:grid;grid-template-columns:180px 1fr 240px;align-items:center;}
 .hl{display:flex;gap:18px;}
@@ -503,12 +483,9 @@ Promise.all([
 #gpass-btn:disabled{opacity:.4;cursor:not-allowed;}
 #gexit-btn{background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.32);color:#fff;border-radius:6px;padding:5px 9px;font-size:12px;cursor:pointer;}
 #gexit-btn:hover{background:rgba(255,255,255,.2);}
-
 #ghint-pop{display:none;position:fixed;top:70px;left:50%;transform:translateX(-50%);z-index:5600;background:rgba(20,20,20,.9);color:#ffe066;padding:8px 18px;border-radius:8px;font-size:14px;font-weight:bold;pointer-events:none;white-space:nowrap;}
 #gfb{display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:6000;font-size:54px;pointer-events:none;animation:gbounce .6s ease forwards;}
 @keyframes gbounce{0%{opacity:0;transform:translate(-50%,-64%) scale(.5)}30%{opacity:1;transform:translate(-50%,-50%) scale(1.2)}70%{opacity:1;transform:translate(-50%,-50%) scale(1)}100%{opacity:0;transform:translate(-50%,-44%) scale(.9)}}
-
-/* ===== 게임 결과 ===== */
 #gresult{display:none;position:fixed;inset:0;z-index:6000;background:rgba(0,0,0,.62);justify-content:flex-start;align-items:center;flex-direction:column;padding-top:20px;overflow-y:auto;}
 #gresult.on{display:flex;}
 .grbox{background:#fff;border-radius:16px;padding:24px 28px;width:520px;max-width:96vw;box-shadow:0 8px 40px rgba(0,0,0,.3);margin-bottom:12px;}
@@ -545,7 +522,6 @@ Promise.all([
 .lbmt{color:#bbb;font-size:13px;text-align:center;padding:10px 0;}
 </style>
 
-<!-- 게임 시작 오버레이 -->
 <div id="game-overlay">
   <div class="gbox">
     <h2>🗺️ 지역 찾기</h2>
@@ -562,7 +538,6 @@ Promise.all([
   </div>
 </div>
 
-<!-- 게임 HUD -->
 <div id="ghud">
   <div class="hl">
     <div class="hblk"><div class="hlbl">남은 시간</div><div id="gtimer">60</div></div>
@@ -588,10 +563,8 @@ Promise.all([
 
 <script>
 (function() {
-  // ===== 음식 이모지 =====
   var FOOD_EMOJIS = ['🍕','🍔','🍜','🍣','🌮','🍩','🍦','🍗','🥗','🍱','🥐','🍛','🧆','🥩','🍤','🍙','🥘','🍝','🥪','🫕','🍢','🍖','🥟','🫔'];
 
-  // ===== 시군구 데이터 + 인접 지역 =====
   var REGIONS = {
     "서울특별시":{adjacent:["인천광역시","경기도"]},
     "부산광역시":{adjacent:["울산광역시","경상남도","김해시","양산시"]},
@@ -765,18 +738,16 @@ Promise.all([
     "서귀포시":{adjacent:["제주시"]},
   };
 
-  // 난이도 (1:쉬움, 2:보통, 3:어려움)
   var DIFF = {};
   Object.keys(REGIONS).forEach(function(r) {
     var adjCount = REGIONS[r].adjacent.length;
-    if (adjCount >= 5) DIFF[r] = 1;       // 인접 많음 = 쉬움
-    else if (adjCount >= 2) DIFF[r] = 2;  // 보통
-    else DIFF[r] = 3;                      // 적음 = 어려움
+    if (adjCount >= 5) DIFF[r] = 1;
+    else if (adjCount >= 2) DIFF[r] = 2;
+    else DIFF[r] = 3;
   });
 
-  var LB = [];  // 세션 순위표
+  var LB = [];
 
-  // ===== 게임 상태 =====
   var G = {
     active: false, timer: 0, intv: null,
     queue: [], idx: 0, score: 0,
@@ -795,7 +766,6 @@ Promise.all([
     return validKeys.sort(function(){ return Math.random() - 0.5; });
   }
 
-  // ===== UI 초기화 =====
   (function initGame() {
     var grid = document.getElementById('egrid');
     var startBtn = document.getElementById('gbtn');
@@ -835,7 +805,6 @@ Promise.all([
     document.getElementById('gexit-btn').addEventListener('click', exitGame);
   })();
 
-  // ===== 게임 시작 =====
   function startGame(emoji) {
     G.active = true; G.timer = 60; G.score = 0;
     G.passLeft = 3; G.wrongCnt = 0; G.log = [];
@@ -857,7 +826,6 @@ Promise.all([
       if (G.timer <= 0) endGame();
     }, 1000);
 
-    // 지도 클릭 핸들러 설치
     installClickHandler();
   }
 
@@ -876,23 +844,20 @@ Promise.all([
     hideHintPop();
   }
 
-  // ===== 지도 클릭 핸들러 =====
   var gameClickHandler = null;
   function installClickHandler() {
-    var svg = document.querySelector('svg#map') || document.getElementById('map');
-    if (!svg) return;
+    var mapDiv = document.getElementById('map');
+    if (!mapDiv) return;
 
     gameClickHandler = function(e) {
       if (!G.active || G.locked) return;
       var target = e.target;
-      var sgPath = target.closest('path[data-sigungu]');
-      if (!sgPath) return;
-      var clicked = sgPath.getAttribute('data-sigungu');
+      if (!target || target.tagName !== 'path') return;
+      var clicked = target.getAttribute('data-sigungu');
       if (!clicked) return;
 
       var correct = G.queue[G.idx];
       if (clicked === correct) {
-        // 정답
         G.score++; G.log.push({name:correct, result:'correct'});
         colorRegion(clicked, '#66bb6a');
         showFB('⭕', '#4caf50');
@@ -900,7 +865,6 @@ Promise.all([
         document.getElementById('gscore').textContent = G.score;
         setTimeout(nextQ, 350);
       } else {
-        // 오답
         G.wrongCnt++;
         colorRegion(clicked, '#ef5350');
         showFB('❌', '#ef5350');
@@ -921,13 +885,11 @@ Promise.all([
       }
     };
 
-    svg.addEventListener('click', gameClickHandler);
+    mapDiv.addEventListener('click', gameClickHandler);
   }
 
   function colorRegion(name, color) {
-    var svg = document.querySelector('svg#map') || document.getElementById('map');
-    if (!svg) return;
-    var paths = svg.querySelectorAll('path[data-sigungu="' + name + '"]');
+    var paths = document.querySelectorAll('path[data-sigungu="' + name + '"]');
     paths.forEach(function(p) {
       if (color) p.style.fill = color;
       else p.style.fill = '';
@@ -965,13 +927,11 @@ Promise.all([
     document.getElementById('ghud').classList.remove('on');
     document.getElementById('toolbar').style.display = '';
     hideHintPop();
-    // 클릭 핸들러 제거
-    var svg = document.querySelector('svg#map') || document.getElementById('map');
-    if (svg && gameClickHandler) {
-      svg.removeEventListener('click', gameClickHandler);
+    var mapDiv = document.getElementById('map');
+    if (mapDiv && gameClickHandler) {
+      mapDiv.removeEventListener('click', gameClickHandler);
       gameClickHandler = null;
     }
-    // 색상 초기화
     var paths = document.querySelectorAll('path[data-sigungu]');
     paths.forEach(function(p){ p.style.fill = ''; });
   }
@@ -982,9 +942,9 @@ Promise.all([
     document.getElementById('ghud').classList.remove('on');
     document.getElementById('toolbar').style.display = '';
     hideHintPop();
-    var svg = document.querySelector('svg#map') || document.getElementById('map');
-    if (svg && gameClickHandler) {
-      svg.removeEventListener('click', gameClickHandler);
+    var mapDiv = document.getElementById('map');
+    if (mapDiv && gameClickHandler) {
+      mapDiv.removeEventListener('click', gameClickHandler);
       gameClickHandler = null;
     }
     if (G.emoji) {
@@ -1015,7 +975,6 @@ Promise.all([
     html += '<div class="grbtns"><button class="grbtn grbtn-go" onclick="window.doRetry()">다시 하기</button><button class="grbtn grbtn-cl" onclick="window.doClose()">지도로 돌아가기</button></div>';
     html += '</div>';
 
-    // 순위표
     html += '<div class="lbbox"><h3>🏆 이번 세션 순위표</h3>';
     if (LB.length === 0) {
       html += '<div class="lbmt">아직 기록이 없어요</div>';
