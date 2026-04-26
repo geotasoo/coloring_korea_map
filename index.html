@@ -297,7 +297,11 @@ window._km = {
   get nkLayer() { return nkLayer; },
   get skLayer() { return skLayer; },
   get nkVisible() { return nkVisible; },
-  set nkVisible(v) { nkVisible = v; }
+  set nkVisible(v) { nkVisible = v; },
+  get borderMode() { return borderMode; },
+  set borderMode(v) { borderMode = v; },
+  get selectedProvinces() { return selectedProvinces; },
+  get provinceNames() { return provinceNames; }
 };
 
 map.createPane('seaPane');map.getPane('seaPane').style.zIndex=100;
@@ -541,6 +545,10 @@ Promise.all([
     btn.style.borderColor=colors[borderMode];
   }
   updateBorderBtn();
+  
+  // 게임용 함수 노출
+  window._updateLayers = updateLayers;
+  window._updateBorderBtn = updateBorderBtn;
 
   $('btn-sg').addEventListener('click',()=>{
     animateMapFade(()=>{
@@ -711,15 +719,42 @@ Promise.all([
         var nkBtn = document.getElementById('btn-nk');
         if (nkBtn) nkBtn.textContent = '🌑 북측';
       }
+      
+      // 6. 시군 모드로 강제 전환 + 모든 시도 선택
+      KM.borderMode = 3; // 시군 모드
+      
+      // 모든 시도 선택
+      if (KM.provinceNames && KM.provinceNames.length > 0) {
+        KM.provinceNames.forEach(function(n) { KM.selectedProvinces.add(n); });
+        var pc = document.getElementById('provinceCheckboxes');
+        if (pc) {
+          pc.querySelectorAll('input').forEach(function(c){ c.checked = true; });
+        }
+        var pcCount = document.getElementById('provinceSelectedCount');
+        if (pcCount) pcCount.textContent = KM.selectedProvinces.size;
+      }
+      
+      // 레이어 업데이트 (시군 지도 표시)
+      if (typeof window._updateLayers === 'function') {
+        window._updateLayers();
+      }
+      if (typeof window._updateBorderBtn === 'function') {
+        window._updateBorderBtn();
+      }
     }
     
-    // 6. DOM 직접 조작 - path 색상 클리어 (게임 클래스)
+    // 7. DOM 직접 조작 - path 색상 클리어 (게임 클래스)
     var paths = document.querySelectorAll('path[data-sigungu]');
     paths.forEach(function(p){ 
       p.style.fill = ''; 
       p.style.fillOpacity = '';
       p.classList.remove('gcor', 'gwfl', 'gpas');
     });
+    
+    // 8. 지도를 처음 위치로 이동 (센터: 36.5, 127.8 / 줌: 7.0)
+    if (KM && KM.map) {
+      KM.map.setView([36.5, 127.8], 7.0);
+    }
 
     updatePassBtn();
     updateWrong();
@@ -912,10 +947,10 @@ Promise.all([
     
     hideHud();
     
-    // 지도를 처음 상태로 이동 (센터: 36.5, 127.8 / 줌: 7.0)
+    // 지도를 처음 상태로 이동 (센터: 36.5, 127.8 / 줌: 6.5)
     var KM = window._km;
     if (KM && KM.map) {
-      KM.map.flyTo([36.5, 127.8], 7.0, {
+      KM.map.flyTo([36.5, 127.8], 6.5, {
         duration: 0.7,
         easeLinearity: 0.5
       });
