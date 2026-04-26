@@ -121,8 +121,9 @@
     #gfb { display:none; position:fixed; top:50%; left:50%; transform:translate(-50%,-50%); font-size:120px; z-index:6000; pointer-events:none; }
     
     /* 결과판 */
-    #gresult { display:none; position:fixed; inset:0; z-index:6000; background:transparent; justify-content:flex-start; align-items:center; flex-direction:column; padding-top:12px; overflow-y:auto; }
+    #gresult { display:none; position:fixed; inset:0; z-index:6000; background:transparent; justify-content:flex-start; align-items:center; flex-direction:column; padding-top:12px; overflow-y:auto; pointer-events:none; }
     #gresult.on { display:flex; }
+    #gresult .grbox, #gresult .lbbox { pointer-events:auto; }
     .grbox { background:#37474f; color:#fff; border-radius:12px; padding:20px 28px; width:auto; max-width:600px; box-shadow:0 8px 40px rgba(0,0,0,.6); margin-bottom:8px; }
     .grbadges { display:flex; gap:12px; justify-content:center; flex-wrap:wrap; margin-bottom:16px; }
     .grbadge { border-radius:10px; padding:8px 16px; text-align:center; min-width:75px; }
@@ -883,7 +884,18 @@ Promise.all([
     window.GAME_ACTIVE = false;
     document.getElementById('ghud').classList.remove('on');
     hideHud();
-    showResult();
+    
+    // 지도를 처음 상태로 이동 (센터: 36.5, 127.8 / 줌: 6.5)
+    var KM = window._km;
+    if (KM && KM.map) {
+      KM.map.flyTo([36.5, 127.8], 6.5, {
+        duration: 0.7,
+        easeLinearity: 0.5
+      });
+    }
+    
+    // 줌 애니메이션 후 결과판 표시 (라벨이 정확한 위치에 찍히도록)
+    setTimeout(showResult, 750);
   }
 
   function showResult() {
