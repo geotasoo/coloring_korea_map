@@ -139,9 +139,9 @@
 </head>
 <body>
 <header style="background:#2E7D5E; color:#fff; padding:10px; font-size:18px; display:flex; justify-content:space-between; align-items:center; flex-shrink:0;">
-  <span>우리나라 지도 색칠하기 & 점찍기 🎗️🗺️🖌️🍺🍗🤪 v2.0 20260422</span>
+  <span>우리나라 지도 색칠하기 & 점찍기 & 게임 🎗️🐯🖌️🍗 v2.2 20260426</span>
   <div id="iconLinks" style="display:flex; gap:12px; align-items:center;">
-    <span id="egg-trigger" style="cursor:pointer;font-size:18px;" title="">🐤</span>
+    <span id="egg-trigger" style="cursor:pointer;font-size:18px;" title="">🕹️</span>
     <a href="https://buymeacoffee.com/geotasoo" target="_blank" data-tip="커피보내기" style="color:#fff; font-size:18px; text-decoration:none;">☕</a>
     <a href="https://geotasoo.tistory.com/entry/%EC%84%B8%EA%B3%84%EC%A7%80%EB%8F%84-%EC%83%89%EC%B9%A0%ED%95%98%EA%B8%B0-%EC%9B%B9%ED%8E%98%EC%9D%B4%EC%A7%80" target="_blank" data-tip="세계지도 색칠하기" style="color:#fff; font-size:18px; text-decoration:none;">🗺️</a>
     <div id="linkTooltip" style="display:none; position:fixed; background:rgba(0,0,0,0.85); color:#fff; font-size:12px; padding:4px 6px; border-radius:4px; white-space:nowrap; pointer-events:none; z-index:9999;"></div>
@@ -192,7 +192,6 @@
   <div id="map-wrap">
     <div id="helpLink">
       PC에서 사용을 권장합니다. 모바일에서는 점찍기가 힘들어요.<br>
-      이 웹페이지는 모두 황병삼쌤 덕분입니다. 고맙습니다.<br>
       <a href="https://geotasoo.tistory.com/entry/%EC%9A%B0%EB%A6%AC%EB%82%98%EB%9D%BC-%EC%A7%80%EB%8F%84-%EC%83%89%EC%B9%A0%ED%95%98%EA%B8%B0-%EC%9B%B9%ED%8E%98%EC%9D%B4%EC%A7%80" target="_blank">사용법보기/생각나누기</a>
     </div>
     <div id="map"></div>
@@ -624,7 +623,6 @@ Promise.all([
         REGIONS[name] = true;
       }
     });
-    console.log('Game REGIONS initialized:', Object.keys(REGIONS).length);
   };
 
   function buildQueue() {
@@ -654,78 +652,62 @@ Promise.all([
     document.getElementById('toolbar').style.display = 'none';
     document.getElementById('ghud').classList.add('on');
 
-    // 시군 모드로 전환 (borderMode 3)
-    if (typeof borderMode !== 'undefined' && borderMode !== 3) {
-      if (typeof updateBorderBtn === 'function') {
-        // borderMode를 3으로 설정하고 레이어 업데이트
-        window.borderMode = 3;
-        if (typeof updateLayers === 'function') updateLayers();
-      }
-    }
-
     // ===== 완전 초기화 =====
     var KM = window._km;
-    if (!KM) {
-      console.warn('Map data not yet loaded');
-    }
     
-    try {
-      if (KM) {
-        // 1. 배경지도 끄기
-        if (KM.baseOn) {
-          KM.map.removeLayer(KM.baseLayer);
-          KM.baseOn = false;
-          var baseBtn = document.getElementById('btn-base');
-          if (baseBtn) baseBtn.textContent = '🌚 배경지도';
-        }
-        
-        // 2. 점찍기 모드 끄기
-        if (KM.dotMode && typeof window._closePanels === 'function') {
-          window._closePanels();
-        }
-        
-        // 3. 모든 점 제거
-        KM.dotMarkers.forEach(function(m) { 
-          try { KM.map.removeLayer(m); } catch(e) {}
-        });
-        KM.dotMarkers.length = 0;
-        KM.selectedCities.clear();
-        KM.manualPins.length = 0;
-        
-        // 4. 모든 색칠 제거
-        KM.coloredSg.clear();
-        KM.coloredSd.clear();
-        
-        if (KM.sgLayer) {
-          KM.sgLayer.eachLayer(function(layer) {
-            layer.setStyle({fillColor: '#ffffff', fillOpacity: 0});
-          });
-        }
-        if (KM.sdLayer) {
-          KM.sdLayer.eachLayer(function(layer) {
-            layer.setStyle({fillColor: '#ffffff', fillOpacity: 0.3});
-          });
-        }
-        
-        // 5. 북측 끄기
-        if (KM.nkVisible && KM.nkLayer) {
-          KM.map.removeLayer(KM.nkLayer);
-          KM.nkVisible = false;
-          var nkBtn = document.getElementById('btn-nk');
-          if (nkBtn) nkBtn.textContent = '🌑 북측';
-        }
+    if (KM) {
+      // 1. 배경지도 끄기
+      if (KM.baseOn) {
+        KM.map.removeLayer(KM.baseLayer);
+        KM.baseOn = false;
+        var baseBtn = document.getElementById('btn-base');
+        if (baseBtn) baseBtn.textContent = '🌚 배경지도';
       }
       
-      // 6. DOM 직접 조작 - path 색상 클리어
-      var paths = document.querySelectorAll('path[data-sigungu]');
-      paths.forEach(function(p){ 
-        p.style.fill = ''; 
-        p.style.fillOpacity = '';
-        p.classList.remove('gcor', 'gwfl', 'gpas');
+      // 2. 점찍기 모드 끄기
+      if (KM.dotMode && typeof window._closePanels === 'function') {
+        window._closePanels();
+      }
+      
+      // 3. 모든 점 제거
+      KM.dotMarkers.forEach(function(m) { 
+        try { KM.map.removeLayer(m); } catch(e) {}
       });
-    } catch(e) {
-      console.warn('Reset partial:', e);
+      KM.dotMarkers.length = 0;
+      KM.selectedCities.clear();
+      KM.manualPins.length = 0;
+      
+      // 4. 모든 색칠 제거
+      KM.coloredSg.clear();
+      KM.coloredSd.clear();
+      
+      if (KM.sgLayer) {
+        KM.sgLayer.eachLayer(function(layer) {
+          layer.setStyle({fillColor: '#ffffff', fillOpacity: 0});
+        });
+      }
+      if (KM.sdLayer) {
+        KM.sdLayer.eachLayer(function(layer) {
+          layer.setStyle({fillColor: '#ffffff', fillOpacity: 0.3});
+        });
+      }
+      
+      // 5. 북측 끄기
+      if (KM.nkVisible && KM.nkLayer) {
+        KM.map.removeLayer(KM.nkLayer);
+        KM.nkVisible = false;
+        var nkBtn = document.getElementById('btn-nk');
+        if (nkBtn) nkBtn.textContent = '🌑 북측';
+      }
     }
+    
+    // 6. DOM 직접 조작 - path 색상 클리어 (게임 클래스)
+    var paths = document.querySelectorAll('path[data-sigungu]');
+    paths.forEach(function(p){ 
+      p.style.fill = ''; 
+      p.style.fillOpacity = '';
+      p.classList.remove('gcor', 'gwfl', 'gpas');
+    });
 
     updatePassBtn();
     updateWrong();
