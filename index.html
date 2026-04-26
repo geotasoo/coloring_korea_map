@@ -99,6 +99,14 @@
     #gtimer { font-size:28px; font-weight:bold; }
     #gtimer.red { color:#ff5252; animation:pulse .5s infinite; }
     @keyframes pulse { 50% { opacity:.5; } }
+    
+    /* 10초 미만 화면 전체 깜빡임 */
+    #danger-flash { display:none; position:fixed; inset:0; pointer-events:none; z-index:9999; background:rgba(255,23,68,0.15); }
+    #danger-flash.on { display:block; animation:dangerFlash 1s infinite; }
+    @keyframes dangerFlash {
+      0%, 100% { opacity:1; }
+      50% { opacity:0; }
+    }
     #gscore { font-size:28px; font-weight:bold; }
     .hc { display:flex; flex-direction:column; align-items:center; gap:4px; }
     #gq { font-size:24px; font-weight:bold; }
@@ -192,7 +200,7 @@
 <div id="main-container">
   <div id="map-wrap">
     <div id="helpLink">
-      PC에서 사용을 권장합니다.<br> 모바일에서는 점찍기가 힘들어요. 게임도 힘들어요.<br>
+      PC에서 사용을 권장합니다. 모바일에서는 점찍기가 힘들어요.<br>
       <a href="https://geotasoo.tistory.com/entry/%EC%9A%B0%EB%A6%AC%EB%82%98%EB%9D%BC-%EC%A7%80%EB%8F%84-%EC%83%89%EC%B9%A0%ED%95%98%EA%B8%B0-%EC%9B%B9%ED%8E%98%EC%9D%B4%EC%A7%80" target="_blank">사용법보기/생각나누기</a>
     </div>
     <div id="map"></div>
@@ -599,6 +607,9 @@ Promise.all([
 <!-- 피드백 -->
 <div id="gfb"></div>
 
+<!-- 10초 남았을 때 화면 전체 빨간 깜빡임 -->
+<div id="danger-flash"></div>
+
 <!-- 결과판 -->
 <div id="gresult"></div>
 
@@ -720,6 +731,17 @@ Promise.all([
       var t = document.getElementById('gtimer');
       t.textContent = G.timer;
       t.className = G.timer <= 10 ? 'red' : '';
+      
+      // 10초 이하면 화면 전체 빨간 깜빡임
+      var flash = document.getElementById('danger-flash');
+      if (flash) {
+        if (G.timer <= 10 && G.timer > 0) {
+          flash.classList.add('on');
+        } else {
+          flash.classList.remove('on');
+        }
+      }
+      
       if (G.timer <= 0) endGame();
     }, 1000);
 
@@ -883,9 +905,14 @@ Promise.all([
     G.active = false;
     window.GAME_ACTIVE = false;
     document.getElementById('ghud').classList.remove('on');
+    
+    // 깜빡임 끄기
+    var flash = document.getElementById('danger-flash');
+    if (flash) flash.classList.remove('on');
+    
     hideHud();
     
-    // 지도를 처음 상태로 이동 (센터: 36.5, 127.8 / 줌: 6.5)
+    // 지도를 처음 상태로 이동 (센터: 36.5, 127.8 / 줌: 7.0)
     var KM = window._km;
     if (KM && KM.map) {
       KM.map.flyTo([36.5, 127.8], 7.0, {
