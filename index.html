@@ -740,8 +740,29 @@ Promise.all([
     var mapDiv = document.getElementById('map');
     if (!mapDiv) return;
 
+    // 드래그 감지를 위한 mousedown/mouseup 좌표 추적
+    var mouseDownPos = null;
+    var DRAG_THRESHOLD = 5; // 5픽셀 이상 움직이면 드래그로 판단
+
+    var mouseDownHandler = function(e) {
+      mouseDownPos = { x: e.clientX, y: e.clientY };
+    };
+
     gameClickHandler = function(e) {
       if (!G.active || G.locked) return;
+      
+      // 드래그 감지: mousedown과 click 위치 비교
+      if (mouseDownPos) {
+        var dx = Math.abs(e.clientX - mouseDownPos.x);
+        var dy = Math.abs(e.clientY - mouseDownPos.y);
+        if (dx > DRAG_THRESHOLD || dy > DRAG_THRESHOLD) {
+          // 드래그였음 - 클릭 무시
+          mouseDownPos = null;
+          return;
+        }
+      }
+      mouseDownPos = null;
+      
       var target = e.target;
       if (!target || target.tagName !== 'path') return;
       var clicked = target.getAttribute('data-sigungu');
@@ -791,6 +812,10 @@ Promise.all([
       }
     };
 
+    // 핸들러를 저장해서 나중에 제거할 수 있게
+    gameClickHandler._mouseDownHandler = mouseDownHandler;
+
+    mapDiv.addEventListener('mousedown', mouseDownHandler);
     mapDiv.addEventListener('click', gameClickHandler);
   }
 
@@ -845,6 +870,9 @@ Promise.all([
     var mapDiv = document.getElementById('map');
     if (mapDiv && gameClickHandler) {
       mapDiv.removeEventListener('click', gameClickHandler);
+      if (gameClickHandler._mouseDownHandler) {
+        mapDiv.removeEventListener('mousedown', gameClickHandler._mouseDownHandler);
+      }
       gameClickHandler = null;
     }
   }
@@ -863,6 +891,9 @@ Promise.all([
     var wrong3   = G.log.filter(function(l){ return l.result === 'wrong3'; });
     var passes   = G.log.filter(function(l){ return l.result === 'pass'; });
 
+    // 지도에 라벨 추가
+    addResultLabels(corrects, wrong3, passes);
+
     var html = '<div class="grbox">';
     html += '<div class="grbadges">';
     html += '<div class="grbadge bc"><div class="n">' + corrects.length + '</div><div class="l">✅ 정답</div></div>';
@@ -875,6 +906,62 @@ Promise.all([
     var rs = document.getElementById('gresult');
     rs.innerHTML = html;
     rs.classList.add('on');
+  }
+
+  // 게임 결과 라벨 저장 (나중에 제거할 수 있도록)
+  var resultLabels = [];
+
+  function addResultLabels(corrects, wrong3, passes) {
+    var KM = window._km;
+    if (!KM || !KM.map || !KM.sgLayer) return;
+
+    // 기존 라벨 제거
+    resultLabels.forEach(function(l) {
+      try { KM.map.removeLayer(l); } catch(e) {}
+    });
+    resultLabels = [];
+
+    // 각 지역의 중심점 찾기
+    function getCentroid(regionName) {
+      var center = null;
+      KM.sgLayer.eachLayer(function(layer) {
+        if (center) return;
+        var feature = layer.feature;
+        if (feature && feature.properties && feature.properties.NL_NAME_2 === regionName) {
+          // Leaflet의 getBounds().getCenter() 사용
+          try {
+            center = layer.getBounds().getCenter();
+          } catch(e) {}
+        }
+      });
+      return center;
+    }
+
+    function addLabel(regionName, color) {
+      var center = getCentroid(regionName);
+      if (!center) return;
+
+      // DivIcon으로 텍스트 라벨 만들기
+      var icon = L.divIcon({
+        className: 'result-label',
+        html: '<div style="color:' + color + ';font-weight:bold;font-size:12px;text-shadow:-1px -1px 0 #fff,1px -1px 0 #fff,-1px 1px 0 #fff,1px 1px 0 #fff,0 0 3px #fff;white-space:nowrap;text-align:center;">' + regionName + '</div>',
+        iconSize: [80, 20],
+        iconAnchor: [40, 10]
+      });
+
+      var marker = L.marker(center, {
+        icon: icon,
+        interactive: false,
+        keyboard: false
+      }).addTo(KM.map);
+
+      resultLabels.push(marker);
+    }
+
+    // 각 카테고리별 라벨 추가
+    corrects.forEach(function(item) { addLabel(item.name, '#2e7d32'); }); // 초록
+    wrong3.forEach(function(item)   { addLabel(item.name, '#c62828'); }); // 빨강
+    passes.forEach(function(item)   { addLabel(item.name, '#e65100'); }); // 주황
   }
 
   // 이벤트 리스너
