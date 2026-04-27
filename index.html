@@ -148,7 +148,7 @@
 </head>
 <body>
 <header style="background:#2E7D5E; color:#fff; padding:10px; font-size:18px; display:flex; justify-content:space-between; align-items:center; flex-shrink:0;">
-  <span>우리나라 지도 색칠하기 & 점찍기 & 게임 🎗️🐯🖌️🍗 v2.2 20260426</span>
+  <span>우리나라 지도 색칠하기 & 점찍기 & 게임 ㅌ2 🎗️🐯🖌️🍗 v2.2 20260426</span>
   <div id="iconLinks" style="display:flex; gap:12px; align-items:center;">
     <span id="egg-trigger" style="cursor:pointer;font-size:18px;" title="">🕹️</span>
     <a href="https://buymeacoffee.com/geotasoo" target="_blank" data-tip="커피보내기" style="color:#fff; font-size:18px; text-decoration:none;">☕</a>
@@ -454,6 +454,45 @@ Promise.all([
   }); // 기본 숨김 - addTo(map) 안 함
 
   // 속성명: NL_NAME_1 (시도), NL_NAME_2 (시군)
+  
+  // 게임용 지역명 변환 헬퍼 - 같은 이름 구분 + 광역시 처리
+  function getRegionDisplayName(props) {
+    var name = props.NL_NAME_2;
+    var sido = props.NL_NAME_1 || '';
+    if (!name) return name;
+    
+    // 1. 광역시/특별시/특별자치시 → 짧게 (서울특별시 → 서울)
+    if (name === '서울특별시' || name === '서울') return '서울';
+    if (name === '부산광역시' || name === '부산') return '부산';
+    if (name === '대구광역시' || name === '대구') return '대구';
+    if (name === '인천광역시' || name === '인천') return '인천';
+    if (name === '대전광역시' || name === '대전') return '대전';
+    if (name === '울산광역시' || name === '울산') return '울산';
+    if (name === '세종특별자치시' || name === '세종') return '세종';
+    
+    // 2. 광주: 광역시 vs 경기도 광주 구분 (NL_NAME_1으로 판단)
+    if (name === '광주광역시') return '광주(광역시)';
+    if (name === '광주') {
+      // sido(NL_NAME_1)에 '경기'가 들어있으면 경기 광주
+      if (sido.includes('경기')) return '광주(경기)';
+      // 그 외(광주광역시 또는 빈 값)는 광역시로
+      return '광주(광역시)';
+    }
+    
+    // 3. 고성: 강원 vs 경남 구분 (NL_NAME_1으로 판단)
+    if (name === '고성') {
+      if (sido.includes('경상남도') || sido.includes('경남')) return '고성(경남)';
+      if (sido.includes('강원')) return '고성(강원)';
+      // 정보 부족 시 그대로
+      return '고성';
+    }
+    
+    return name;
+  }
+  
+  // 게임 모듈에서도 사용할 수 있도록 전역 노출
+  window._getRegionDisplayName = getRegionDisplayName;
+  
   provinceNames=[...new Set(sdJson.features.map(f=>f.properties.NL_NAME_1))].sort();
   const pc=$('provinceCheckboxes');pc.innerHTML='';
   provinceNames.forEach(n=>{const l=document.createElement('label');l.innerHTML=`<input type="checkbox" value="${n}" checked> ${n}`;pc.appendChild(l);});
@@ -475,11 +514,11 @@ Promise.all([
       if(sgVisible){toggleSgLayerColor(ly);sdBorderLayer.bringToFront();}
     });
     if(ft.properties?.NL_NAME_2){
-      const n=ft.properties.NL_NAME_2;
+      const n = getRegionDisplayName(ft.properties);
       ly.on('mouseover',e=>{ if(!window.GAME_ACTIVE) showTT(n,e); });
       ly.on('mousemove',e=>{ if(!window.GAME_ACTIVE) showTT(n,e); });
       ly.on('mouseout',hideTT);
-      // 게임용: path에 data-sigungu 속성 추가
+      // 게임용: path에 data-sigungu 속성 추가 (변환된 이름)
       ly.on('add', function() {
         var el = ly.getElement();
         if (el) el.setAttribute('data-sigungu', n);
@@ -638,7 +677,8 @@ Promise.all([
   window.initGameRegions = function(sgJson) {
     REGIONS = {};
     sgJson.features.forEach(function(feature) {
-      var name = feature.properties.NL_NAME_2;
+      // 변환 헬퍼로 표시명 가져오기 (광역시는 짧게, 동명 지역은 구분)
+      var name = getRegionDisplayName(feature.properties);
       if (name && !REGIONS[name]) {
         REGIONS[name] = true;
       }
@@ -647,9 +687,10 @@ Promise.all([
 
   function buildQueue() {
     var keys = Object.keys(REGIONS);
-    // 광역시/특별시/특별자치시 제외
+    // 광역시/특별시/특별자치시도 게임에 포함 (서울, 부산, 대구 등)
+    // 단, 변환되지 않은 풀네임이 있다면 제외
     var filtered = keys.filter(function(r) {
-      return !r.match(/(광역시|특별시|특별자치시)$/);
+      return !r.match(/(광역시|특별시|특별자치시|특별자치도)$/);
     });
     // 랜덤 셔플
     return filtered.sort(function(){ return Math.random() - 0.5; });
@@ -975,12 +1016,31 @@ Promise.all([
     html += '<div class="grbadge bp"><div class="n">' + passes.length + '</div><div class="l">⏭️ 패스</div></div>';
     html += '</div>';
     html += '<div style="text-align:center;font-size:12px;color:#b0bec5;margin-bottom:12px;">💡 결과 지도를 마우스 휠로 확대/축소, 드래그로 이동하며 자세히 살펴볼 수 있어요!</div>';
-    html += '<div class="grbtns"><button class="grbtn grbtn-go" onclick="location.reload()">다시 하기</button><button class="grbtn grbtn-cl" onclick="location.reload()">지도로 돌아가기</button></div>';
+    html += '<div class="grbtns"><button class="grbtn grbtn-go" id="gres-restart">다시 하기</button><button class="grbtn grbtn-cl" id="gres-close">지도로 돌아가기</button></div>';
     html += '</div>';
 
     var rs = document.getElementById('gresult');
     rs.innerHTML = html;
     rs.classList.add('on');
+
+    // 다시 하기: 결과 닫고 게임 안내 화면으로
+    document.getElementById('gres-restart').addEventListener('click', function() {
+      // 결과 라벨 제거
+      var KM2 = window._km;
+      if (KM2 && KM2.map) {
+        resultLabels.forEach(function(m){ try{ KM2.map.removeLayer(m); } catch(e){} });
+      }
+      resultLabels.length = 0;
+      // 결과 패널 숨기기
+      rs.classList.remove('on');
+      // 게임 안내 화면 다시 표시
+      document.getElementById('game-overlay').classList.add('active');
+    });
+
+    // 지도로 돌아가기: 새로고침 (색칠지도로)
+    document.getElementById('gres-close').addEventListener('click', function() {
+      location.reload();
+    });
   }
 
   // 게임 결과 라벨 저장 (나중에 제거할 수 있도록)
@@ -996,14 +1056,18 @@ Promise.all([
     });
     resultLabels = [];
 
-    // 각 지역의 중심점 찾기
+    // 각 지역의 중심점 찾기 (변환된 표시명 기준)
     function getCentroid(regionName) {
       var center = null;
       KM.sgLayer.eachLayer(function(layer) {
         if (center) return;
         var feature = layer.feature;
-        if (feature && feature.properties && feature.properties.NL_NAME_2 === regionName) {
-          // Leaflet의 getBounds().getCenter() 사용
+        if (!feature || !feature.properties) return;
+        // 변환된 이름으로 비교 (광주(경기), 고성(강원) 등)
+        var displayName = window._getRegionDisplayName 
+          ? window._getRegionDisplayName(feature.properties)
+          : feature.properties.NL_NAME_2;
+        if (displayName === regionName) {
           try {
             center = layer.getBounds().getCenter();
           } catch(e) {}
