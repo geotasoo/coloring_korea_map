@@ -992,13 +992,10 @@ Promise.all([
     
     hideHud();
     
-    // 지도를 처음 상태로 이동 (센터: 36.5, 127.8 / 줌: 6.5)
+    // 지도를 결과 화면용 위치로 이동 (좀 더 확대)
     var KM = window._km;
     if (KM && KM.map) {
-      KM.map.flyTo([36.5, 127.8], 6.5, {
-        duration: 0.7,
-        easeLinearity: 0.5
-      });
+      KM.map.setView([36.3, 127.8], 7.3, { animate: true, duration: 0.7 });
     }
     
     // 줌 애니메이션 후 결과판 표시 (라벨이 정확한 위치에 찍히도록)
