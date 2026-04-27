@@ -148,7 +148,7 @@
 </head>
 <body>
 <header style="background:#2E7D5E; color:#fff; padding:10px; font-size:18px; display:flex; justify-content:space-between; align-items:center; flex-shrink:0;">
-  <span>우리나라 지도 색칠하기 & 점찍기 & 게임 ㅌ2 🎗️🐯🖌️🍗 v2.2 20260426</span>
+  <span>우리나라 지도 색칠하기 & 점찍기 & 게임 ㅌ3🎗️🐯🖌️🍗 v2.2 20260426</span>
   <div id="iconLinks" style="display:flex; gap:12px; align-items:center;">
     <span id="egg-trigger" style="cursor:pointer;font-size:18px;" title="">🕹️</span>
     <a href="https://buymeacoffee.com/geotasoo" target="_blank" data-tip="커피보내기" style="color:#fff; font-size:18px; text-decoration:none;">☕</a>
@@ -678,7 +678,9 @@ Promise.all([
     REGIONS = {};
     sgJson.features.forEach(function(feature) {
       // 변환 헬퍼로 표시명 가져오기 (광역시는 짧게, 동명 지역은 구분)
-      var name = getRegionDisplayName(feature.properties);
+      var name = window._getRegionDisplayName 
+        ? window._getRegionDisplayName(feature.properties)
+        : feature.properties.NL_NAME_2;
       if (name && !REGIONS[name]) {
         REGIONS[name] = true;
       }
