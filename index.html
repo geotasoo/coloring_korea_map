@@ -148,7 +148,7 @@
 </head>
 <body>
 <header style="background:#2E7D5E; color:#fff; padding:10px; font-size:18px; display:flex; justify-content:space-between; align-items:center; flex-shrink:0;">
-  <span>우리나라 지도 색칠하기 & 점찍기 & 게임 ㅌ3🎗️🐯🖌️🍗 v2.2 20260426</span>
+  <span>우리나라 지도 색칠하기 & 점찍기 & 게임 🎗️🐯🖌️🍗 v2.3 20260428</span>
   <div id="iconLinks" style="display:flex; gap:12px; align-items:center;">
     <span id="egg-trigger" style="cursor:pointer;font-size:18px;" title="">🕹️</span>
     <a href="https://buymeacoffee.com/geotasoo" target="_blank" data-tip="커피보내기" style="color:#fff; font-size:18px; text-decoration:none;">☕</a>
@@ -434,10 +434,7 @@ Promise.all([
   fetch('202604_sk.geojson').then(r=>r.json())
 ]).then(([sdJson,sgJson,nkJson,skJson])=>{
 
-  // 게임용 REGIONS 초기화
-  if (typeof window.initGameRegions === 'function') {
-    window.initGameRegions(sgJson);
-  }
+  // (게임용 REGIONS 초기화는 getRegionDisplayName 정의 후로 이동)
 
   // 북한 레이어 (토글 가능, 색칠 가능) - 기본 숨김
   nkLayer = L.geoJSON(nkJson,{
@@ -492,6 +489,11 @@ Promise.all([
   
   // 게임 모듈에서도 사용할 수 있도록 전역 노출
   window._getRegionDisplayName = getRegionDisplayName;
+  
+  // 게임용 REGIONS 초기화 (getRegionDisplayName 정의 후 호출)
+  if (typeof window.initGameRegions === 'function') {
+    window.initGameRegions(sgJson);
+  }
   
   provinceNames=[...new Set(sdJson.features.map(f=>f.properties.NL_NAME_1))].sort();
   const pc=$('provinceCheckboxes');pc.innerHTML='';
