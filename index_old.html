@@ -544,8 +544,6 @@ Promise.all([
 
     const sel=Array.from(selectedProvinces);
     const ff=sel.length===0?(f=>false):(f=>sel.includes(f.properties.NL_NAME_1));
-    // 전체 시도가 모두 선택됐을 때만 남한 전체 국경선을 표시 (일부 선택 시엔 표시 안 함)
-    const fullSelection = provinceNames.length>0 && sel.length===provinceNames.length;
 
     // borderMode: 0=없애기, 1=나라(sd fill만), 2=시도(sd fill+border), 3=시군(sg)
     if(borderMode===0){
@@ -570,11 +568,9 @@ Promise.all([
       sdBorderLayer=L.geoJSON(sdJson,{filter:ff,style:()=>({color:'#222',weight:parseFloat($('slider-sd').value),fillOpacity:0,opacity:1}),interactive:false}).addTo(map);
       sdLayer.setStyle({fillOpacity:defaultLandOpacity,opacity:1});
       sdBorderLayer.bringToFront();
-      // 남한 국경선(나라 굵기)은 전체 선택일 때만 맨 위에 얹기
-      if(fullSelection){
-        skBorderLayer=L.geoJSON(skJson,{style:()=>({color:'#333',weight:parseFloat($('slider-nk').value),fillOpacity:0,opacity:1}),interactive:false}).addTo(map);
-        skBorderLayer.bringToFront();
-      }
+      // 남한 국경선(나라 굵기)을 맨 위에 얹기
+      skBorderLayer=L.geoJSON(skJson,{style:()=>({color:'#333',weight:parseFloat($('slider-nk').value),fillOpacity:0,opacity:1}),interactive:false}).addTo(map);
+      skBorderLayer.bringToFront();
     } else {
       // 시군(3): sg + sd border
       sdLayer=createSdLayer(ff).addTo(map);
@@ -583,11 +579,9 @@ Promise.all([
       sdBorderLayer.bringToFront();
       sdLayer.setStyle({fillOpacity:0,opacity:0.5});
       map.addLayer(sgLayer);
-      // 남한 국경선(나라 굵기)은 전체 선택일 때만 맨 위에 얹기
-      if(fullSelection){
-        skBorderLayer=L.geoJSON(skJson,{style:()=>({color:'#333',weight:parseFloat($('slider-nk').value),fillOpacity:0,opacity:1}),interactive:false}).addTo(map);
-        skBorderLayer.bringToFront();
-      }
+      // 남한 국경선(나라 굵기)을 맨 위에 얹기
+      skBorderLayer=L.geoJSON(skJson,{style:()=>({color:'#333',weight:parseFloat($('slider-nk').value),fillOpacity:0,opacity:1}),interactive:false}).addTo(map);
+      skBorderLayer.bringToFront();
     }
 
     if(nkVisible) nkLayer.bringToBack();
