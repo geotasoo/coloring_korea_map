@@ -35,7 +35,7 @@
   // ───────── 상태 ─────────
   const S = {
     colors: new Map(),      // 나라코드 → 색
-    current: '#D9D9D9',     // 시험지 회색 1단계 (두 번째 칸)
+    current: '#A6A6A6',     // 시험지 회색 3단계 (세 번째 칸)
     palette: 0,
     tool: 'paint',          // 'paint' | 'erase'
     land: '#FFFFFF',
